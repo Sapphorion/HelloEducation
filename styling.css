@@ -1,0 +1,20 @@
+navigation ul {
+  list-style: none;
+  display: flex;
+  gap: 0.5rem;
+  justify-content: center;
+  align-items: center;
+  flex-wrap: wrap;
+  overflow-x: auto;
+}
+navigation a {
+  display: inline-block;
+  text-decoration: none;
+  color: #fff;
+  background: #43a547;
+  padding: 0.5rem 1rem;
+  border-radius: 6px;
+  font-weight: 600;
+  transition: background-color 120ms ease, transform 80ms ease;
+}
+navigation a:hover { background: #368d3f; transform: translateY(-2px); }
