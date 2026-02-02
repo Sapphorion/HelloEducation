@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="styling.css">
+    <title>Tutors - Book Your Session</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(125deg, #3074f3 0%, #2a9b1b 80%);
+            min-height: 100vh;
+            padding: 40px 20px;
+        }
+        
+        header {
+            color: white;
+            padding: 1rem;
+            text-align: center;
+        }
+        
+        main {
+            max-width: 1200px;
+            margin: 2rem auto;
+            padding: 0 1rem;
+        }
+        
+        .container {
+            width: 100%;
+        }
+        
+        h1 {
+            text-align: center;
+            color: white;
+            margin: 0;
+            font-size: 4.5625rem;
+        }
+        
+        h1.logo {
+            margin-bottom: 0.5rem;
+        }
+        
+        .page-heading {
+            font-size: 2.5rem;
+            margin-bottom: 30px;
+        }
+        
+        .tutors-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 30px;
+        }
+        
+        .tutor-card {
+            background: white;
+            border-radius: 12px;
+            overflow: hidden;
+            box-shadow: 0 8px 16px rgba(0, 0, 0, 0.2);
+            transition: transform 0.3s, box-shadow 0.3s;
+            cursor: pointer;
+        }
+        
+        .tutor-card:hover {
+            transform: translateY(-8px);
+            box-shadow: 0 12px 24px rgba(0, 0, 0, 0.3);
+        }
+        
+        .tutor-image {
+            width: 160px;
+            height: 160px;
+            object-fit: cover;
+            object-position: center;
+            display: block;
+            margin: 20px auto 0;
+            border-radius: 12px;
+            background: #e0e0e0;
+        }
+        
+        .tutor-info {
+            padding: 20px;
+        }
+        
+        .tutor-name {
+            font-size: 1.5em;
+            font-weight: bold;
+            color: #333;
+            margin-bottom: 8px;
+        }
+        
+        .tutor-subject {
+            color: #667eea;
+            font-weight: 600;
+            margin-bottom: 12px;
+        }
+        
+        .tutor-bio {
+            color: #666;
+            font-size: 0.95em;
+            margin-bottom: 16px;
+            line-height: 1.5;
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <h1 class="logo">HelloEducation</h1>
+        <h1 class="page-heading">Find Your Perfect Tutor</h1>
+    </header>
+    <navigation>
+        <ul>
+            <li><a href="index.html">Home</a></li>
+            <li><a href="services.html">Services</a></li>
+            <li><a href="tutors.html">Tutors</a></li>
+            <li><a href="resources.html">Resources</a></li>
+            <li><a href="contact.html">Contact</a></li>
+        </ul>
+    </navigation>
+    <main>
+        <div class="container">
+        <div class="tutors-grid">
+            <!-- Tutor Card 1 -->
+            <div class="tutor-card">
+                <img src="images/Gemini_Generated_Image_ehs1xsehs1xsehs1.png" alt="Nicole" class="tutor-image">
+                <div class="tutor-info">
+                    <div class="tutor-name">Nicole</div>
+                    <div class="tutor-subject">Grade 3 - Post matric</div>
+                    <div class="tutor-bio"> I have a passion for education and helping students achieve their goals. I specialise in Mathematics, Science, Life Science, Accounting and CAT. 
+                        I am experienced in working with students of all levels and have a strong background in dealing with learners with learning barriers. I have over 10 years of teaching experience under my belt, from working in a classroom to online education. 
+                        I believe everyone is capable of learning and achieving success with the right support and guidance.</div>
+                    <button class="book-btn" onclick="window.location.href='/HelloEducation/booking.html?tutor=' + encodeURIComponent('Nicole')">Book a Session</button>
+                </div>
+            </div>
+            
+            <!-- Tutor Card 2 -->
+            <div class="tutor-card">
+                <img src="images/WhatsApp Image 2025-12-31 at 2.14.33 PM.jpeg" alt="Deedra" class="tutor-image">
+                <div class="tutor-info">
+                    <div class="tutor-name">Deedra</div>
+                    <div class="tutor-subject"> Grade 3 - 9</div>
+                    <div class="tutor-bio">I am a dedicated tutor with expertise in helping students from Grade 3 to Grade 9. I have a strong background in curriculum development and is passionate about making learning engaging and accessible for all students.
+                        I specialise in English, Natural Science, EMS, and Social Sciences. My teaching approach focuses on building a solid foundation of knowledge while fostering critical thinking and problem-solving skills.
+                    </div>
+                    <button class="book-btn" onclick="window.location.href='/HelloEducation/booking.html?tutor=' + encodeURIComponent('Deedra')">Book a Session</button>
+                </div>
+            </div>
+            
+            <!-- Tutor Card 3 -->
+            <div class="tutor-card">
+                <img src="images/WhatsApp Image 2026-02-01 at 5.31.58 PM.jpeg" alt="Karen" class="tutor-image">
+                <div class="tutor-info">
+                    <div class="tutor-name">Karen</div>
+                    <div class="tutor-subject">Grade 2 - 7</div>
+                    <div class="tutor-bio">I am passionate about the little ones and making learning fun for them. I specialise in building confidence in reading and writing skills for young learners.
+                        I also focus on foundational mathematics to ensure a strong base for future learning. My teaching style is interactive and engaging, using games and activities to make lessons enjoyable.
+                    </div>
+                    <button class="book-btn" onclick="window.location.href='/HelloEducation/booking.html?tutor=' + encodeURIComponent('Karen')">Book a Session</button>
+                </div>
+            </div>
+        </div>
+        </div>
+    </main>
+    
+    <script>
+        function openBooking(tutorId) {
+            // Redirect to booking portal with tutor parameter
+            window.location.href = `/booking.html?tutor=${tutorId}`;
+        }
+    </script>
+</body>
+</html>

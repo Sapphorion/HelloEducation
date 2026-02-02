@@ -3,6 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="styling.css">
     <title>HelloEducation</title>
     <style>
         * {
@@ -11,20 +12,56 @@
             box-sizing: border-box;
         }
         body {
-            font-family: Arial, sans-serif;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(125deg, #3074f3 0%, #2a9b1b 80%);
+            min-height: 100vh;
+            padding: 40px 20px;
             line-height: 1.6;
             color: #333;
+            font-size: 20px;
+            font-weight: 500;
         }
         header {
-            background-color: #43a547;
             color: white;
             padding: 1rem;
             text-align: center;
+        }
+        header h1 {
+            font-size: 4.5625rem;
+            margin: 0.25rem 0;
+        }
+        header h1.page-heading {
+            margin-bottom: 30px;
         }
         main {
             max-width: 1200px;
             margin: 2rem auto;
             padding: 0 1rem;
+        }
+        #about {
+            background: white;
+            border-radius: 12px;
+            padding: 2rem;
+            box-shadow: 0 8px 16px rgba(0, 0, 0, 0.2);
+            color: #333;
+        }
+        #about h2 {
+            color: #333;
+            margin-bottom: 1rem;
+        }
+        button {
+            background-color: #43a547;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+            font-weight: 600;
+            transition: background-color 0.3s ease;
+        }
+        button:hover {
+            background-color: #368d3f;
         }
         footer {
             background-color: #333;
@@ -38,17 +75,17 @@
 <body>
     <header>
         <h1>HelloEducation</h1>
-        <p>The First word of the future is, Hello!</p>
+        <h1 class="page-heading">Home</h1>
     </header>
     <navigation>
         <ul>
-            <li><a href="main.html">Home</a></li>
+            <li><a href="index.html">Home</a></li>
             <li><a href="services.html">Services</a></li>
             <li><a href="tutors.html">Tutors</a></li>
             <li><a href="resources.html">Resources</a></li>
             <li><a href="contact.html">Contact</a></li>
         </ul>
-    
+    </navigation>
     <main>
         <section id="about">
             <h2>About Hello Education</h2>
@@ -74,7 +111,7 @@
     </main>
     
     <footer>
-        <p>&copy; 2024 HelloEducation. All rights reserved.</p>
+        <p>&copy; 2023 HelloEducation. All rights reserved.</p>
     </footer>
 </body>
 </html>

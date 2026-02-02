@@ -6,15 +6,60 @@ navigation ul {
   align-items: center;
   flex-wrap: wrap;
   overflow-x: auto;
+  padding-top: 20px;
 }
 navigation a {
   display: inline-block;
   text-decoration: none;
   color: #fff;
   background: #43a547;
-  padding: 0.5rem 1rem;
+  padding: 0.5rem 1.625rem;
   border-radius: 6px;
   font-weight: 600;
   transition: background-color 120ms ease, transform 80ms ease;
 }
 navigation a:hover { background: #368d3f; transform: translateY(-2px); }
+
+button {
+  background-color: #43a547;
+  color: white;
+  padding: 10px 20px;
+  border: none;
+  border-radius: 5px;
+  cursor: pointer;
+  font-size: 16px;
+  font-weight: 600;
+  transition: background-color 0.3s ease;
+  
+}
+button:hover {
+  background-color: #368d3f;
+}
+
+.btn-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  margin-top: 1rem;
+}
+
+.btn-stack button {
+  width: 100%;
+  padding: 10px 20px;
+}
+
+.book-btn {
+  background-color: #43a547;
+  color: white;
+  padding: 10px 20px;
+  border: none;
+  border-radius: 5px;
+  cursor: pointer;
+  font-size: 16px;
+  font-weight: 600;
+  transition: background-color 0.3s ease;
+}
+
+.book-btn:hover {
+  background-color: #368d3f;
+}
