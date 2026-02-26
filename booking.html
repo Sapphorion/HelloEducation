@@ -243,6 +243,18 @@
         }
         
         @media (max-width: 768px) {
+            header h1 {
+                font-size: 2.5rem;
+            }
+            
+            header h2 {
+                font-size: 1.5rem;
+            }
+            
+            .booking-container {
+                border-radius: 8px;
+            }
+            
             .booking-content {
                 grid-template-columns: 1fr;
             }
@@ -250,6 +262,47 @@
             .tutors-panel {
                 border-right: none;
                 border-bottom: 1px solid #e0e0e0;
+                max-height: 300px;
+            }
+            
+            .calendar-section {
+                padding: 1rem;
+            }
+            
+            .tutor-item {
+                padding: 0.75rem;
+                margin-bottom: 0.75rem;
+            }
+            
+            .booking-form {
+                padding: 1rem;
+            }
+            
+            input, textarea {
+                font-size: 16px;
+            }
+        }
+        
+        @media (max-width: 480px) {
+            header h1 {
+                font-size: 2rem;
+            }
+            
+            header h2 {
+                font-size: 1.2rem;
+            }
+            
+            .booking-container {
+                box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+            }
+            
+            .tutors-panel {
+                max-height: 250px;
+            }
+            
+            button {
+                font-size: 14px;
+                padding: 0.6rem 1rem;
             }
         }
     </style>
@@ -306,7 +359,8 @@
     </div>
     
     <script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.10/index.global.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.38.0/dist/module.min.js" type="module"></script>
-    <script type="module" src="booking.js"></script>
+    <!-- Supabase script commented out - now using Google Forms for bookings -->
+    <!-- <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.38.0/dist/module.min.js" type="module"></script> -->
+    <!-- <script type="module" src="booking.js"></script> -->
 </body>
 </html>

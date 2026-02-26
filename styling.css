@@ -7,18 +7,48 @@ navigation ul {
   flex-wrap: wrap;
   overflow-x: auto;
   padding-top: 20px;
+  padding-bottom: 10px;
 }
 navigation a {
   display: inline-block;
   text-decoration: none;
   color: #fff;
   background: #43a547;
-  padding: 0.5rem 1.625rem;
+  padding: 0.5rem 1rem;
   border-radius: 6px;
   font-weight: 600;
+  font-size: 0.95rem;
   transition: background-color 120ms ease, transform 80ms ease;
+  white-space: nowrap;
 }
-navigation a:hover { background: #368d3f; transform: translateY(-2px); }
+navigation a:hover { 
+  background: #368d3f; 
+  transform: translateY(-2px); 
+}
+
+@media (max-width: 768px) {
+  navigation ul {
+    gap: 0.4rem;
+    padding-top: 15px;
+  }
+  
+  navigation a {
+    padding: 0.4rem 0.75rem;
+    font-size: 0.85rem;
+  }
+}
+
+@media (max-width: 480px) {
+  navigation ul {
+    gap: 0.3rem;
+    padding-top: 10px;
+  }
+  
+  navigation a {
+    padding: 0.35rem 0.6rem;
+    font-size: 0.75rem;
+  }
+}
 
 button {
   background-color: #43a547;
@@ -49,6 +79,7 @@ button:hover {
 }
 
 .book-btn {
+  display: inline-block;
   background-color: #43a547;
   color: white;
   padding: 10px 20px;
@@ -58,8 +89,19 @@ button:hover {
   font-size: 16px;
   font-weight: 600;
   transition: background-color 0.3s ease;
+  text-decoration: none;
+  text-align: center;
+  width: 100%;
+  box-sizing: border-box;
 }
 
 .book-btn:hover {
   background-color: #368d3f;
+}
+
+@media (max-width: 480px) {
+  .book-btn {
+    padding: 8px 16px;
+    font-size: 14px;
+  }
 }

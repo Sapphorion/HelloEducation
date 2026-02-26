@@ -144,6 +144,51 @@
             min-height: 100vh;
             padding: 40px 20px;
         }
+        
+        @media (max-width: 768px) {
+            h1 {
+                font-size: 2.5rem;
+            }
+            
+            h1.page-heading {
+                font-size: 1.5rem;
+                margin-bottom: 20px;
+            }
+            
+            .container {
+                max-width: 100%;
+                padding: 20px;
+                margin: 0 10px;
+            }
+            
+            .contact-channels {
+                grid-template-columns: 1fr;
+                gap: 20px;
+            }
+            
+            .channel {
+                padding: 15px;
+            }
+            
+            .channel h2 {
+                font-size: 1.1rem;
+            }
+            
+            .channel a {
+                font-size: 0.9rem;
+                padding: 8px 16px;
+            }
+            
+            .form-section {
+                margin-top: 20px;
+                padding-top: 20px;
+            }
+            
+            input, textarea {
+                font-size: 16px;
+                padding: 10px;
+            }
+        }
     </style>
 </head>
 <body>
