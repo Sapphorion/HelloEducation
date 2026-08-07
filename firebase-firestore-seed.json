@@ -1,0 +1,82 @@
+{
+  "users": {
+    "admin-user-id": {
+      "role": "admin",
+      "email": "admin@helloeducation.com",
+      "name": "Main Admin"
+    }
+  },
+  "tutors": {
+    "tutor-1": {
+      "name": "Aisha Khan",
+      "email": "aisha@helloeducation.com",
+      "subject": "Maths",
+      "bio": "Experienced mathematics tutor with a focus on GCSE and A-level support.",
+      "status": "active",
+      "createdBy": "admin-user-id"
+    },
+    "tutor-2": {
+      "name": "Liam Patel",
+      "email": "liam@helloeducation.com",
+      "subject": "English",
+      "bio": "Passionate English tutor helping students build confidence in writing and literature.",
+      "status": "active",
+      "createdBy": "admin-user-id"
+    }
+  },
+  "students": {
+    "student-1": {
+      "name": "Maya Brooks",
+      "email": "maya@helloeducation.com",
+      "grade": "GCSE",
+      "status": "active",
+      "createdBy": "admin-user-id"
+    }
+  },
+  "dashboardData": {
+    "main": {
+      "summary": "Student dashboard overview",
+      "tasks": [
+        { "title": "Complete algebra worksheet", "done": false },
+        { "title": "Review essay feedback", "done": true }
+      ],
+      "upcomingSessions": [
+        { "title": "Algebra revision", "time": "Today • 4:00 PM" },
+        { "title": "Essay planning", "time": "Tomorrow • 10:30 AM" }
+      ],
+      "resources": [
+        { "title": "GCSE Maths formula sheet", "type": "PDF" },
+        { "title": "Study planner template", "type": "Worksheet" }
+      ],
+      "tutors": [
+        { "name": "Aisha Khan", "subject": "Maths" },
+        { "name": "Liam Patel", "subject": "English" }
+      ]
+    }
+  },
+  "tutorDashboardData": {
+    "main": {
+      "summary": "Tutor dashboard overview",
+      "sessions": [
+        { "title": "Science support", "time": "Today • 2:00 PM", "status": "Scheduled" },
+        { "title": "Reading club", "time": "Today • 6:00 PM", "status": "Scheduled" }
+      ],
+      "requests": [
+        { "name": "Maya Brooks", "subject": "Biology", "note": "Needs help preparing for a test", "status": "Pending" }
+      ],
+      "availability": [
+        { "day": "Monday", "time": "3:00 PM - 6:00 PM" },
+        { "day": "Wednesday", "time": "5:00 PM - 8:00 PM" }
+      ]
+    }
+  },
+  "bookings": {
+    "booking-1": {
+      "studentId": "student-1",
+      "tutorId": "tutor-1",
+      "subject": "Maths",
+      "status": "pending",
+      "createdAt": "2026-08-06T00:00:00.000Z"
+    }
+  }
+}

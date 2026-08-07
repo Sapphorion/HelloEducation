@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>HelloEducation Firebase Setup</title>
+  <link rel="stylesheet" href="styling.css" />
+</head>
+<body>
+  <header>
+    <h1>HelloEducation</h1>
+    <h1 class="page-heading">Firebase Setup</h1>
+  </header>
+  <main class="auth-page">
+    <section class="auth-panel">
+      <h2>Enable Firebase for real sign-in</h2>
+      <ol>
+        <li>Open your Firebase console and enable Authentication → Email/Password.</li>
+        <li>Your Firestore database is already running in production mode, so you can use it directly.</li>
+        <li>Create a collection called <strong>users</strong>.</li>
+        <li>Create a document for each account using the Firebase UID as the document ID and a field: <strong>role</strong> = <strong>student</strong> or <strong>tutor</strong>.</li>
+        <li>Create two Firestore collections: <strong>dashboardData</strong> and <strong>tutorDashboardData</strong>, each with a document named <strong>main</strong>.</li>
+      </ol>
+      <p>After that, sign in through the student or tutor login links and the dashboard will load the real Firestore-backed data.</p>
+    </section>
+  </main>
+  <footer>
+    <p>&copy; 2023 HelloEducation. All rights reserved.</p>
+  </footer>
+</body>
+</html>

@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>HelloEducation Admin Dashboard</title>
+  <link rel="stylesheet" href="styling.css" />
+</head>
+<body>
+  <header>
+    <h1>HelloEducation</h1>
+    <h1 class="page-heading">Admin Dashboard</h1>
+  </header>
+
+  <navigation>
+    <ul>
+      <li><a href="index.html">Home</a></li>
+      <li><a href="services.html">Services</a></li>
+      <li><a href="tutors.html">Tutors</a></li>
+      <li><a href="contact.html">Contact</a></li>
+    </ul>
+  </navigation>
+
+  <main class="auth-page">
+    <section class="auth-panel dashboard-panel">
+      <h2 id="welcomeMessage">Admin portal</h2>
+      <p id="summaryText">Manage tutor profiles and user roles.</p>
+
+      <div class="dashboard-grid">
+        <div class="dashboard-card">
+          <h3>Grant a role</h3>
+          <p class="card-hint">Look up a signed-up account by email, then promote it to tutor or admin. New accounts start as students until you do this.</p>
+          <form id="roleLookupForm" class="admin-form">
+            <input id="roleLookupEmail" type="email" placeholder="Account email" required />
+            <button type="submit">Look up</button>
+          </form>
+          <div id="roleLookupResult" class="admin-result"></div>
+        </div>
+        <div class="dashboard-card">
+          <h3>Add a tutor profile</h3>
+          <p class="card-hint">Adds a public tutor listing. This does not create their login — create their Firebase Auth account first, then have them sign in on the Student tab and grant them the tutor role above.</p>
+          <form id="addTutorForm" class="admin-form">
+            <input id="tutorName" type="text" placeholder="Name" required />
+            <input id="tutorEmail" type="email" placeholder="Email" required />
+            <input id="tutorSubject" type="text" placeholder="Subject" required />
+            <textarea id="tutorBio" placeholder="Short bio" rows="2"></textarea>
+            <button type="submit">Add tutor</button>
+          </form>
+          <p class="auth-feedback" id="tutorFeedback"></p>
+        </div>
+      </div>
+
+      <div class="dashboard-card">
+        <h3>Current tutors</h3>
+        <ul id="tutorDirectory"><li>Loading…</li></ul>
+      </div>
+
+      <p><a href="firebase-setup-guide.html">Need to configure Firestore and Authentication?</a></p>
+      <button id="signOutBtn" type="button">Sign Out</button>
+    </section>
+  </main>
+
+  <footer>
+    <p>&copy; 2023 HelloEducation. All rights reserved.</p>
+  </footer>
+
+  <script type="module">
+    import { initializeApp } from 'https://www.gstatic.com/firebasejs/11.14.0/firebase-app.js';
+    import { getAuth, onAuthStateChanged, signOut } from 'https://www.gstatic.com/firebasejs/11.14.0/firebase-auth.js';
+    import { getFirestore, collection, query, where, getDocs, updateDoc, doc, addDoc, deleteDoc } from 'https://www.gstatic.com/firebasejs/11.14.0/firebase-firestore.js';
+    import { firebaseConfig, isFirebaseConfigured } from './firebase-config.js';
+
+    const role = localStorage.getItem('helloEducationRole');
+    if (role !== 'admin') {
+      window.location.href = 'login.html?role=admin';
+    }
+
+    const app = initializeApp(firebaseConfig);
+    const auth = getAuth(app);
+    const db = getFirestore(app);
+    const welcomeMessage = document.getElementById('welcomeMessage');
+    const summaryText = document.getElementById('summaryText');
+    const signOutBtn = document.getElementById('signOutBtn');
+    const roleLookupForm = document.getElementById('roleLookupForm');
+    const roleLookupResult = document.getElementById('roleLookupResult');
+    const addTutorForm = document.getElementById('addTutorForm');
+    const tutorFeedback = document.getElementById('tutorFeedback');
+    const tutorDirectory = document.getElementById('tutorDirectory');
+
+    async function renderTutorDirectory() {
+      const snapshot = await getDocs(collection(db, 'tutors'));
+      if (snapshot.empty) {
+        tutorDirectory.innerHTML = '<li>No tutor profiles yet.</li>';
+        return;
+      }
+      tutorDirectory.innerHTML = snapshot.docs.map((docSnap) => {
+        const tutor = docSnap.data();
+        return `
+          <li>
+            <span>${tutor.name} — ${tutor.subject}</span>
+            <button class="action-btn secondary" data-tutor-id="${docSnap.id}" type="button">Remove</button>
+          </li>
+        `;
+      }).join('');
+    }
+
+    roleLookupForm.addEventListener('submit', async (event) => {
+      event.preventDefault();
+      const email = document.getElementById('roleLookupEmail').value.trim();
+      roleLookupResult.innerHTML = 'Searching…';
+
+      const usersQuery = query(collection(db, 'users'), where('email', '==', email));
+      const snapshot = await getDocs(usersQuery);
+
+      if (snapshot.empty) {
+        roleLookupResult.innerHTML = 'No account found with that email. They need to sign in on the Student tab at least once first.';
+        return;
+      }
+
+      const userDocSnap = snapshot.docs[0];
+      const currentRole = userDocSnap.data().role;
+
+      roleLookupResult.innerHTML = `
+        <p>Current role: <strong>${currentRole}</strong></p>
+        <div class="dashboard-actions">
+          <button class="action-btn" data-role="student" type="button">Set student</button>
+          <button class="action-btn" data-role="tutor" type="button">Set tutor</button>
+          <button class="action-btn" data-role="admin" type="button">Set admin</button>
+        </div>
+      `;
+
+      roleLookupResult.querySelectorAll('button[data-role]').forEach((button) => {
+        button.addEventListener('click', async () => {
+          await updateDoc(doc(db, 'users', userDocSnap.id), { role: button.dataset.role });
+          roleLookupResult.innerHTML = `<p>Updated. Current role: <strong>${button.dataset.role}</strong></p>`;
+        });
+      });
+    });
+
+    addTutorForm.addEventListener('submit', async (event) => {
+      event.preventDefault();
+      const name = document.getElementById('tutorName').value.trim();
+      const email = document.getElementById('tutorEmail').value.trim();
+      const subject = document.getElementById('tutorSubject').value.trim();
+      const bio = document.getElementById('tutorBio').value.trim();
+
+      await addDoc(collection(db, 'tutors'), {
+        name,
+        email,
+        subject,
+        bio,
+        status: 'active',
+        createdBy: auth.currentUser ? auth.currentUser.uid : null
+      });
+
+      tutorFeedback.textContent = `${name} added to the tutor directory.`;
+      addTutorForm.reset();
+      await renderTutorDirectory();
+    });
+
+    tutorDirectory.addEventListener('click', async (event) => {
+      const button = event.target.closest('button[data-tutor-id]');
+      if (!button) return;
+      await deleteDoc(doc(db, 'tutors', button.dataset.tutorId));
+      await renderTutorDirectory();
+    });
+
+    onAuthStateChanged(auth, (user) => {
+      if (!user && !isFirebaseConfigured()) {
+        welcomeMessage.textContent = `Welcome back, ${localStorage.getItem('helloEducationUser') || 'admin'}!`;
+        summaryText.textContent = 'Demo mode is active. Connect Firebase to enable full admin control.';
+        return;
+      }
+
+      if (!user) {
+        window.location.href = 'login.html?role=admin';
+        return;
+      }
+
+      welcomeMessage.textContent = `Welcome back, ${user.email || 'admin'}!`;
+      summaryText.textContent = 'Your admin account is ready.';
+      renderTutorDirectory();
+    });
+
+    signOutBtn.addEventListener('click', async () => {
+      if (!isFirebaseConfigured()) {
+        localStorage.removeItem('helloEducationRole');
+        localStorage.removeItem('helloEducationUser');
+        window.location.href = 'login.html?role=admin';
+        return;
+      }
+
+      await signOut(auth);
+    });
+  </script>
+</body>
+</html>

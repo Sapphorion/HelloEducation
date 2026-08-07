@@ -1,0 +1,71 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function userRole(userId) {
+      return get(/databases/$(database)/documents/users/$(userId)).data.role;
+    }
+
+    function isAdmin(userId) {
+      return signedIn() && userRole(userId) == 'admin';
+    }
+
+    function isTutor(userId) {
+      return signedIn() && userRole(userId) == 'tutor';
+    }
+
+    function isStudent(userId) {
+      return signedIn() && userRole(userId) == 'student';
+    }
+
+    match /users/{userId} {
+      allow read: if signedIn() && (request.auth.uid == userId || isAdmin(request.auth.uid));
+      // Self-serve signup may only claim the student role. Tutor and admin
+      // roles must be granted by an existing admin (via the admin dashboard
+      // or directly in the Firestore console) — never self-assigned.
+      allow create: if signedIn()
+        && request.auth.uid == userId
+        && request.resource.data.role == 'student';
+      allow update: if signedIn() && (
+        isAdmin(request.auth.uid)
+        || (request.auth.uid == userId && request.resource.data.role == resource.data.role)
+      );
+      allow delete: if isAdmin(request.auth.uid);
+    }
+
+    match /tutors/{tutorId} {
+      allow read: if signedIn();
+      allow create, update, delete: if isAdmin(request.auth.uid);
+    }
+
+    match /students/{studentId} {
+      allow read: if signedIn() && (request.auth.uid == studentId || isAdmin(request.auth.uid));
+      allow create, update: if signedIn() && (request.auth.uid == studentId || isAdmin(request.auth.uid));
+      allow delete: if isAdmin(request.auth.uid);
+    }
+
+    match /dashboardData/{docId} {
+      allow read: if signedIn() && (isAdmin(request.auth.uid) || isStudent(request.auth.uid) || isTutor(request.auth.uid));
+      allow write: if isAdmin(request.auth.uid);
+    }
+
+    match /tutorDashboardData/{docId} {
+      allow read: if signedIn() && (isAdmin(request.auth.uid) || isTutor(request.auth.uid));
+      allow write: if isAdmin(request.auth.uid);
+    }
+
+    match /bookings/{bookingId} {
+      allow read: if signedIn() && (isAdmin(request.auth.uid)
+        || resource.data.studentId == request.auth.uid
+        || resource.data.tutorId == request.auth.uid);
+      allow create: if signedIn() && request.resource.data.studentId == request.auth.uid;
+      allow update: if signedIn() && (isAdmin(request.auth.uid)
+        || request.resource.data.studentId == request.auth.uid
+        || request.resource.data.tutorId == request.auth.uid);
+      allow delete: if isAdmin(request.auth.uid);
+    }
+  }
+}

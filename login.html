@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>HelloEducation Login</title>
+  <link rel="stylesheet" href="styling.css" />
+</head>
+<body>
+  <header>
+    <h1>HelloEducation</h1>
+    <h1 class="page-heading">Login</h1>
+  </header>
+
+  <navigation>
+    <ul>
+      <li><a href="index.html">Home</a></li>
+      <li><a href="services.html">Services</a></li>
+      <li><a href="tutors.html">Tutors</a></li>
+      <li><a href="resources.html">Resources</a></li>
+      <li><a href="contact.html">Contact</a></li>
+      <li><a href="login.html">Login</a></li>
+    </ul>
+  </navigation>
+
+  <main class="auth-page">
+    <section class="auth-panel" aria-label="Authentication panel">
+      <div class="auth-tabs" role="tablist" aria-label="Login type">
+        <button class="auth-tab active" type="button" data-role="student">Student</button>
+        <button class="auth-tab" type="button" data-role="tutor">Tutor</button>
+        <button class="auth-tab" type="button" data-role="admin">Admin</button>
+      </div>
+
+      <h2 id="authTitle">Student Login</h2>
+      <p id="authDescription">Sign in to access your student dashboard.</p>
+
+      <form id="authForm">
+        <input id="email" type="email" placeholder="Email address" required />
+        <input id="password" type="password" placeholder="Password" required />
+        <button type="submit">Sign In</button>
+      </form>
+
+      <p class="auth-feedback" id="authFeedback"></p>
+      <p><a href="firebase-setup-guide.html">Need to enable Firebase first?</a></p>
+      <button class="auth-toggle" type="button" id="toggleMode">Need an account? Contact HelloEducation</button>
+    </section>
+  </main>
+
+  <footer>
+    <p>&copy; 2023 HelloEducation. All rights reserved.</p>
+  </footer>
+
+  <script type="module">
+    import { initializeApp } from 'https://www.gstatic.com/firebasejs/11.14.0/firebase-app.js';
+    import { getAuth, signInWithEmailAndPassword } from 'https://www.gstatic.com/firebasejs/11.14.0/firebase-auth.js';
+    import { getFirestore, doc, getDoc } from 'https://www.gstatic.com/firebasejs/11.14.0/firebase-firestore.js';
+    import { firebaseConfig, isFirebaseConfigured } from './firebase-config.js';
+    import { createUserRoleDocument } from './firestore-setup.js';
+
+    const params = new URLSearchParams(window.location.search);
+    const roleFromUrl = params.get('role');
+    let activeRole = roleFromUrl === 'tutor' ? 'tutor' : roleFromUrl === 'admin' ? 'admin' : 'student';
+
+    const tabs = document.querySelectorAll('.auth-tab');
+    const form = document.getElementById('authForm');
+    const title = document.getElementById('authTitle');
+    const description = document.getElementById('authDescription');
+    const feedback = document.getElementById('authFeedback');
+
+    const isDemoMode = !isFirebaseConfigured();
+
+    let auth = null;
+    let db = null;
+
+    if (!isDemoMode) {
+      const app = initializeApp(firebaseConfig);
+      auth = getAuth(app);
+      db = getFirestore(app);
+    }
+
+    function setRole(role) {
+      activeRole = role;
+      tabs.forEach(tab => tab.classList.toggle('active', tab.dataset.role === role));
+      if (role === 'tutor') {
+        title.textContent = 'Tutor Login';
+        description.textContent = 'Sign in to manage tutoring sessions and availability.';
+      } else if (role === 'admin') {
+        title.textContent = 'Admin Login';
+        description.textContent = 'Sign in to manage tutor profiles and protected portal data.';
+      } else {
+        title.textContent = 'Student Login';
+        description.textContent = 'Sign in to access your student dashboard.';
+      }
+      feedback.textContent = '';
+    }
+
+    tabs.forEach(tab => {
+      tab.addEventListener('click', () => setRole(tab.dataset.role));
+    });
+
+    setRole(activeRole);
+
+    form.addEventListener('submit', async (event) => {
+      event.preventDefault();
+      const email = document.getElementById('email').value.trim();
+      const password = document.getElementById('password').value;
+
+      if (!email || !password) {
+        feedback.textContent = 'Please enter both your email and password.';
+        return;
+      }
+
+      if (isDemoMode) {
+        localStorage.setItem('helloEducationRole', activeRole);
+        localStorage.setItem('helloEducationUser', email);
+        feedback.textContent = 'Demo mode active. Your sign-in preview is ready.';
+        window.location.href = activeRole === 'tutor'
+          ? 'tutor-dashboard.html'
+          : activeRole === 'admin'
+            ? 'admin-dashboard.html'
+            : 'student-dashboard.html';
+        return;
+      }
+
+      try {
+        const userCredential = await signInWithEmailAndPassword(auth, email, password);
+        const userDoc = await getDoc(doc(db, 'users', userCredential.user.uid));
+        const roleFromDb = userDoc.exists() ? userDoc.data().role : null;
+
+        if (!userDoc.exists()) {
+          if (activeRole !== 'student') {
+            feedback.textContent = `This account has not been set up for the ${activeRole} role yet. Please contact the HelloEducation admin.`;
+            await signOut(auth);
+            return;
+          }
+          await createUserRoleDocument(userCredential.user.uid, 'student', userCredential.user.email || '', userCredential.user.displayName || '');
+        } else if (roleFromDb !== activeRole) {
+          feedback.textContent = `This account is not assigned to the ${activeRole} role.`;
+          await signOut(auth);
+          return;
+        }
+
+        localStorage.setItem('helloEducationRole', activeRole);
+        localStorage.setItem('helloEducationUser', userCredential.user.email || '');
+        feedback.textContent = 'Signing you in...';
+        window.location.href = activeRole === 'tutor'
+          ? 'tutor-dashboard.html'
+          : activeRole === 'admin'
+            ? 'admin-dashboard.html'
+            : 'student-dashboard.html';
+      } catch (error) {
+        feedback.textContent = error.message || 'Unable to sign in.';
+      }
+    });
+  </script>
+</body>
+</html>
