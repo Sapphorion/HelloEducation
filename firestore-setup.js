@@ -1,8 +1,8 @@
 // Firestore setup helper for HelloEducation
 // Run this in the browser console after the site is loaded, or use it as a reference for your Firebase console.
 
-import { initializeApp } from 'https://www.gstatic.com/firebasejs/11.14.0/firebase-app.js';
-import { getFirestore, collection, doc, setDoc } from 'https://www.gstatic.com/firebasejs/11.14.0/firebase-firestore.js';
+import { initializeApp } from 'https://www.gstatic.com/firebasejs/12.4.0/firebase-app.js';
+import { getFirestore, collection, doc, setDoc } from 'https://www.gstatic.com/firebasejs/12.4.0/firebase-firestore.js';
 import { firebaseConfig } from './firebase-config.js';
 
 const app = initializeApp(firebaseConfig);

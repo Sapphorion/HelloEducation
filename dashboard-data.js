@@ -1,5 +1,5 @@
-import { initializeApp, getApps } from 'https://www.gstatic.com/firebasejs/11.14.0/firebase-app.js';
-import { getFirestore, collection, getDocs, setDoc, doc, updateDoc } from 'https://www.gstatic.com/firebasejs/11.14.0/firebase-firestore.js';
+import { initializeApp, getApps } from 'https://www.gstatic.com/firebasejs/12.4.0/firebase-app.js';
+import { getFirestore, collection, getDocs, setDoc, doc, updateDoc } from 'https://www.gstatic.com/firebasejs/12.4.0/firebase-firestore.js';
 import { firebaseConfig, isFirebaseConfigured } from './firebase-config.js';
 
 const demoData = {
