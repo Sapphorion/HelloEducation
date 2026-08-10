@@ -223,13 +223,16 @@ exports.deleteAccount = onCall(async (request) => {
 // slip through.
 exports.requestSession = onCall(async (request) => {
   const student = await requireStudent(request.auth);
-  const { tutorId, subject, scheduledAt, notes } = request.data || {};
+  const { tutorId, subject, scheduledAt, notes, format } = request.data || {};
 
   if (!tutorId || typeof tutorId !== 'string') {
     throw new HttpsError('invalid-argument', 'A tutor is required.');
   }
   if (!subject || typeof subject !== 'string' || !subject.trim()) {
     throw new HttpsError('invalid-argument', 'A subject is required.');
+  }
+  if (format !== 'online' && format !== 'faceToFace') {
+    throw new HttpsError('invalid-argument', 'Session format must be online or faceToFace.');
   }
   const scheduledDate = new Date(scheduledAt);
   if (!scheduledAt || Number.isNaN(scheduledDate.getTime())) {
@@ -264,6 +267,7 @@ exports.requestSession = onCall(async (request) => {
     subject: subject.trim(),
     scheduledAt: scheduledTimestamp,
     status: 'pending',
+    format,
     notes: notes ? String(notes).trim() : '',
     createdAt: FieldValue.serverTimestamp()
   });

@@ -290,7 +290,7 @@
         .sort((a, b) => a.scheduledAt.toDate() - b.scheduledAt.toDate());
 
       upcomingReportList.innerHTML = upcoming.length
-        ? upcoming.map((s) => `<li>${s.studentEmail || 'Student'} with ${tutorNameById[s.tutorId] || 'tutor'} — ${s.subject} — ${s.scheduledAt.toDate().toLocaleString()}${s.meetingLink ? ` — <a href="${s.meetingLink}" target="_blank" rel="noopener">Join session</a>` : ''}</li>`).join('')
+        ? upcoming.map((s) => `<li>${s.studentEmail || 'Student'} with ${tutorNameById[s.tutorId] || 'tutor'} — ${s.subject} — ${s.scheduledAt.toDate().toLocaleString()} <span class="status-badge">${s.format === 'faceToFace' ? 'Face-to-face' : 'Online'}</span>${s.meetingLink ? ` — <a href="${s.meetingLink}" target="_blank" rel="noopener">Join session</a>` : ''}</li>`).join('')
         : '<li>Nothing scheduled in the next 7 days.</li>';
 
       const tutorSessionCounts = {};

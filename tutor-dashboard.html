@@ -59,6 +59,10 @@
           <input id="sessionStudentEmail" type="email" placeholder="Student email" required />
           <input id="sessionSubject" type="text" placeholder="Subject" required />
           <input id="sessionDateTime" type="datetime-local" required />
+          <select id="sessionFormat" required>
+            <option value="online">Online</option>
+            <option value="faceToFace">Face-to-face</option>
+          </select>
           <select id="sessionStatus" required>
             <option value="scheduled">Scheduled</option>
             <option value="completed">Completed</option>
@@ -132,6 +136,10 @@
     function generateMeetingLink() {
       const slug = crypto.randomUUID().replace(/-/g, '').slice(0, 16);
       return `https://meet.jit.si/HelloEducation-${slug}`;
+    }
+
+    function formatLabel(session) {
+      return session.format === 'faceToFace' ? 'Face-to-face' : 'Online';
     }
 
     const role = localStorage.getItem('helloEducationRole');
@@ -321,7 +329,7 @@
       mySessionsList.innerHTML = logged.length
         ? logged.map((s) => `
           <li>
-            <span>${s.studentEmail || 'Student'} — ${s.subject} — ${s.scheduledAt.toDate().toLocaleString()} <span class="status-badge">${s.status}</span>${s.meetingLink ? ` — <a href="${s.meetingLink}" target="_blank" rel="noopener">Meeting link</a>` : ''}${s.notes ? `<br>${s.notes}` : ''}</span>
+            <span>${s.studentEmail || 'Student'} — ${s.subject} — ${s.scheduledAt.toDate().toLocaleString()} <span class="status-badge">${s.status}</span> <span class="status-badge">${formatLabel(s)}</span>${s.meetingLink ? ` — <a href="${s.meetingLink}" target="_blank" rel="noopener">Meeting link</a>` : ''}${s.notes ? `<br>${s.notes}` : ''}</span>
             <button class="action-btn secondary" data-set-link="${s.id}" type="button">${s.meetingLink ? 'Edit link' : 'Add link'}</button>
           </li>
         `).join('')
@@ -335,7 +343,7 @@
       requestList.innerHTML = pending.length
         ? pending.map((s) => `
           <li>
-            <div>${s.studentEmail} — ${s.subject}: ${s.scheduledAt.toDate().toLocaleString()}</div>
+            <div>${s.studentEmail} — ${s.subject}: ${s.scheduledAt.toDate().toLocaleString()} <span class="status-badge">${formatLabel(s)}</span></div>
             <div class="dashboard-actions">
               <button class="action-btn" data-session-id="${s.id}" data-action="accept" type="button">Accept</button>
               <button class="action-btn secondary" data-session-id="${s.id}" data-action="decline" type="button">Decline</button>
@@ -411,6 +419,7 @@
       const studentEmail = document.getElementById('sessionStudentEmail').value.trim();
       const subject = document.getElementById('sessionSubject').value.trim();
       const dateTimeValue = document.getElementById('sessionDateTime').value;
+      const format = document.getElementById('sessionFormat').value;
       const status = document.getElementById('sessionStatus').value;
       const notes = document.getElementById('sessionNotes').value.trim();
 
@@ -429,6 +438,7 @@
         subject,
         scheduledAt: Timestamp.fromDate(new Date(dateTimeValue)),
         status,
+        format,
         notes,
         meetingLink: status === 'scheduled' ? generateMeetingLink() : null,
         createdAt: serverTimestamp()

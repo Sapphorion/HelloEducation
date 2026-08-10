@@ -55,6 +55,10 @@
             <ul id="tutorAvailabilityHint"></ul>
             <input id="requestSubject" type="text" placeholder="Subject" required />
             <input id="requestDateTime" type="datetime-local" required />
+            <select id="requestFormat" required>
+              <option value="online">Online</option>
+              <option value="faceToFace">Face-to-face</option>
+            </select>
             <textarea id="requestNotes" placeholder="Anything the tutor should know (optional)" rows="2"></textarea>
             <button type="submit">Request session</button>
           </form>
@@ -118,6 +122,10 @@
     import { firebaseConfig, isFirebaseConfigured } from './firebase-config.js';
 
     const DAY_NAMES = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+
+    function formatLabel(session) {
+      return session.format === 'faceToFace' ? 'Face-to-face' : 'Online';
+    }
 
     const role = localStorage.getItem('helloEducationRole');
     if (role !== 'student') {
@@ -219,19 +227,19 @@
 
       const upcoming = sessions.filter((s) => s.status === 'scheduled').reverse();
       upcomingSessions.innerHTML = upcoming.length
-        ? upcoming.map((s) => `<li>${s.subject} — ${s.scheduledAt.toDate().toLocaleString()}${s.meetingLink ? ` — <a href="${s.meetingLink}" target="_blank" rel="noopener">Join session</a>` : ''}</li>`).join('')
+        ? upcoming.map((s) => `<li>${s.subject} — ${s.scheduledAt.toDate().toLocaleString()} <span class="status-badge">${formatLabel(s)}</span>${s.meetingLink ? ` — <a href="${s.meetingLink}" target="_blank" rel="noopener">Join session</a>` : ''}</li>`).join('')
         : '<li>No upcoming sessions scheduled.</li>';
 
       const past = sessions.filter((s) => s.status === 'completed');
       progressList.innerHTML = past.length
-        ? past.map((s) => `<li><span>${s.subject} — ${s.scheduledAt.toDate().toLocaleDateString()}${s.notes ? `<br>${s.notes}` : ''}</span></li>`).join('')
+        ? past.map((s) => `<li><span>${s.subject} — ${s.scheduledAt.toDate().toLocaleDateString()} <span class="status-badge">${formatLabel(s)}</span>${s.notes ? `<br>${s.notes}` : ''}</span></li>`).join('')
         : '<li>No session feedback yet.</li>';
 
       const pending = sessions.filter((s) => s.status === 'pending');
       myRequestsList.innerHTML = pending.length
         ? pending.map((s) => `
           <li>
-            <span>${s.subject} — ${s.scheduledAt.toDate().toLocaleString()} <span class="status-badge">pending</span></span>
+            <span>${s.subject} — ${s.scheduledAt.toDate().toLocaleString()} <span class="status-badge">${formatLabel(s)}</span> <span class="status-badge">pending</span></span>
             <button class="action-btn secondary" data-session-id="${s.id}" type="button">Cancel</button>
           </li>
         `).join('')
@@ -286,10 +294,11 @@
       const tutorId = requestTutor.value;
       const subject = requestSubject.value.trim();
       const dateTimeValue = document.getElementById('requestDateTime').value;
+      const format = document.getElementById('requestFormat').value;
       const notes = document.getElementById('requestNotes').value.trim();
 
       try {
-        await requestSessionCallable({ tutorId, subject, scheduledAt: new Date(dateTimeValue).toISOString(), notes });
+        await requestSessionCallable({ tutorId, subject, scheduledAt: new Date(dateTimeValue).toISOString(), format, notes });
         requestFeedback.textContent = 'Request sent! The tutor will confirm or decline it.';
         requestSessionForm.reset();
         tutorAvailabilityHint.innerHTML = '';
