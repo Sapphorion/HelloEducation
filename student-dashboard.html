@@ -45,6 +45,27 @@
         </div>
       </div>
 
+      <div class="dashboard-grid">
+        <div class="dashboard-card">
+          <h3>Request a session</h3>
+          <form id="requestSessionForm" class="admin-form">
+            <select id="requestTutor" required>
+              <option value="">Choose a tutor…</option>
+            </select>
+            <ul id="tutorAvailabilityHint"></ul>
+            <input id="requestSubject" type="text" placeholder="Subject" required />
+            <input id="requestDateTime" type="datetime-local" required />
+            <textarea id="requestNotes" placeholder="Anything the tutor should know (optional)" rows="2"></textarea>
+            <button type="submit">Request session</button>
+          </form>
+          <p class="auth-feedback" id="requestFeedback"></p>
+        </div>
+        <div class="dashboard-card">
+          <h3>My requests</h3>
+          <ul id="myRequestsList"><li>Loading…</li></ul>
+        </div>
+      </div>
+
       <div class="dashboard-card">
         <h3>Progress &amp; feedback</h3>
         <ul id="progressList"><li>Loading…</li></ul>
@@ -61,9 +82,12 @@
   <script type="module">
     import { initializeApp } from 'https://www.gstatic.com/firebasejs/12.4.0/firebase-app.js';
     import { getAuth, onAuthStateChanged, signOut } from 'https://www.gstatic.com/firebasejs/12.4.0/firebase-auth.js';
-    import { getFirestore, collection, query, where, orderBy, getDocs } from 'https://www.gstatic.com/firebasejs/12.4.0/firebase-firestore.js';
+    import { getFirestore, collection, query, where, orderBy, getDocs, updateDoc, doc } from 'https://www.gstatic.com/firebasejs/12.4.0/firebase-firestore.js';
+    import { getFunctions, httpsCallable } from 'https://www.gstatic.com/firebasejs/12.4.0/firebase-functions.js';
     import { firebaseConfig, isFirebaseConfigured } from './firebase-config.js';
     import { fetchDashboardData, saveDashboardData } from './dashboard-data.js';
+
+    const DAY_NAMES = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 
     const role = localStorage.getItem('helloEducationRole');
     if (role !== 'student') {
@@ -73,6 +97,8 @@
     const app = initializeApp(firebaseConfig);
     const auth = getAuth(app);
     const db = getFirestore(app);
+    const functions = getFunctions(app);
+    const requestSessionCallable = httpsCallable(functions, 'requestSession');
     const welcomeMessage = document.getElementById('welcomeMessage');
     const summaryText = document.getElementById('summaryText');
     const taskList = document.getElementById('taskList');
@@ -80,6 +106,12 @@
     const resourceList = document.getElementById('resourceList');
     const tutorList = document.getElementById('tutorList');
     const progressList = document.getElementById('progressList');
+    const requestSessionForm = document.getElementById('requestSessionForm');
+    const requestTutor = document.getElementById('requestTutor');
+    const tutorAvailabilityHint = document.getElementById('tutorAvailabilityHint');
+    const requestSubject = document.getElementById('requestSubject');
+    const requestFeedback = document.getElementById('requestFeedback');
+    const myRequestsList = document.getElementById('myRequestsList');
     const signOutBtn = document.getElementById('signOutBtn');
 
     async function renderSessions() {
@@ -90,7 +122,7 @@
         orderBy('scheduledAt', 'desc')
       );
       const snapshot = await getDocs(sessionsQuery);
-      const sessions = snapshot.docs.map((docSnap) => docSnap.data());
+      const sessions = snapshot.docs.map((docSnap) => ({ id: docSnap.id, ...docSnap.data() }));
 
       const upcoming = sessions.filter((s) => s.status === 'scheduled').reverse();
       upcomingSessions.innerHTML = upcoming.length
@@ -101,7 +133,76 @@
       progressList.innerHTML = past.length
         ? past.map((s) => `<li><span>${s.subject} — ${s.scheduledAt.toDate().toLocaleDateString()}${s.notes ? `<br>${s.notes}` : ''}</span></li>`).join('')
         : '<li>No session feedback yet.</li>';
+
+      const pending = sessions.filter((s) => s.status === 'pending');
+      myRequestsList.innerHTML = pending.length
+        ? pending.map((s) => `
+          <li>
+            <span>${s.subject} — ${s.scheduledAt.toDate().toLocaleString()} <span class="status-badge">pending</span></span>
+            <button class="action-btn secondary" data-session-id="${s.id}" type="button">Cancel</button>
+          </li>
+        `).join('')
+        : '<li>No pending requests.</li>';
     }
+
+    myRequestsList.addEventListener('click', async (event) => {
+      const button = event.target.closest('button[data-session-id]');
+      if (!button) return;
+      await updateDoc(doc(db, 'sessions', button.dataset.sessionId), { status: 'cancelled' });
+      await renderSessions();
+    });
+
+    async function populateTutorSelect() {
+      const snapshot = await getDocs(collection(db, 'tutors'));
+      const tutors = snapshot.docs.map((docSnap) => ({ id: docSnap.id, ...docSnap.data() }));
+
+      requestTutor.innerHTML = '<option value="">Choose a tutor…</option>' + tutors.map((tutor) =>
+        `<option value="${tutor.id}" data-subject="${tutor.subject}">${tutor.name} — ${tutor.subject}</option>`
+      ).join('');
+
+      tutorList.innerHTML = tutors.length
+        ? tutors.map((tutor) => `<li>${tutor.name} — ${tutor.subject}</li>`).join('')
+        : '<li>No tutors listed yet.</li>';
+    }
+
+    requestTutor.addEventListener('change', async () => {
+      const tutorId = requestTutor.value;
+      tutorAvailabilityHint.innerHTML = '';
+      if (!tutorId) return;
+
+      const selectedOption = requestTutor.options[requestTutor.selectedIndex];
+      requestSubject.value = selectedOption.dataset.subject || '';
+
+      const availabilityQuery = query(collection(db, 'availability'), where('tutorId', '==', tutorId));
+      const snapshot = await getDocs(availabilityQuery);
+      const slots = snapshot.docs
+        .map((docSnap) => docSnap.data())
+        .sort((a, b) => a.dayOfWeek - b.dayOfWeek);
+
+      tutorAvailabilityHint.innerHTML = slots.length
+        ? slots.map((slot) => `<li>${DAY_NAMES[slot.dayOfWeek]}: ${slot.startTime}–${slot.endTime}</li>`).join('')
+        : '<li>This tutor hasn\'t set their availability yet — request a time and they can confirm.</li>';
+    });
+
+    requestSessionForm.addEventListener('submit', async (event) => {
+      event.preventDefault();
+      requestFeedback.textContent = 'Sending request…';
+
+      const tutorId = requestTutor.value;
+      const subject = requestSubject.value.trim();
+      const dateTimeValue = document.getElementById('requestDateTime').value;
+      const notes = document.getElementById('requestNotes').value.trim();
+
+      try {
+        await requestSessionCallable({ tutorId, subject, scheduledAt: new Date(dateTimeValue).toISOString(), notes });
+        requestFeedback.textContent = 'Request sent! The tutor will confirm or decline it.';
+        requestSessionForm.reset();
+        tutorAvailabilityHint.innerHTML = '';
+        await renderSessions();
+      } catch (error) {
+        requestFeedback.textContent = error.message || 'Could not send the request.';
+      }
+    });
 
     async function renderDashboard() {
       const data = await fetchDashboardData('student');
@@ -113,7 +214,6 @@
         </li>
       `).join('');
       resourceList.innerHTML = data.resources.map((resource) => `<li>${resource.title} (${resource.type})</li>`).join('');
-      tutorList.innerHTML = data.tutors.map((tutor) => `<li>${tutor.name} — ${tutor.subject}</li>`).join('');
     }
 
     onAuthStateChanged(auth, (user) => {
@@ -131,6 +231,7 @@
       welcomeMessage.textContent = `Welcome back, ${user.email || 'student'}!`;
       renderDashboard();
       renderSessions();
+      populateTutorSelect();
     });
 
     taskList.addEventListener('click', async (event) => {

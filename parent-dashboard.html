@@ -70,6 +70,7 @@
 
       const upcoming = sessions.filter((s) => s.status === 'scheduled').reverse();
       const past = sessions.filter((s) => s.status === 'completed');
+      const pending = sessions.filter((s) => s.status === 'pending').reverse();
 
       return `
         <div class="dashboard-card">
@@ -79,6 +80,10 @@
             <div class="dashboard-card">
               <h3>Upcoming schedule</h3>
               <ul>${upcoming.length ? upcoming.map((s) => `<li>${s.subject} — ${s.scheduledAt.toDate().toLocaleString()}</li>`).join('') : '<li>No upcoming sessions scheduled.</li>'}</ul>
+            </div>
+            <div class="dashboard-card">
+              <h3>Pending requests</h3>
+              <ul>${pending.length ? pending.map((s) => `<li>${s.subject} — ${s.scheduledAt.toDate().toLocaleString()} <span class="status-badge">pending</span></li>`).join('') : '<li>No pending requests.</li>'}</ul>
             </div>
             <div class="dashboard-card">
               <h3>Progress &amp; feedback</h3>

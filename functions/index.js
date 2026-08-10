@@ -1,7 +1,7 @@
 const { onCall, HttpsError } = require('firebase-functions/v2/https');
 const { setGlobalOptions } = require('firebase-functions/v2');
 const { initializeApp } = require('firebase-admin/app');
-const { getFirestore, FieldValue } = require('firebase-admin/firestore');
+const { getFirestore, FieldValue, Timestamp } = require('firebase-admin/firestore');
 const { getAuth } = require('firebase-admin/auth');
 
 initializeApp();
@@ -28,6 +28,20 @@ async function requireAdmin(requestAuth) {
   }
 
   return callerUid;
+}
+
+async function requireStudent(requestAuth) {
+  const callerUid = requestAuth?.uid;
+  if (!callerUid) {
+    throw new HttpsError('unauthenticated', 'You must be signed in.');
+  }
+
+  const callerDoc = await db.doc(`users/${callerUid}`).get();
+  if (!callerDoc.exists || callerDoc.data().role !== 'student') {
+    throw new HttpsError('permission-denied', 'Only a student can request a session.');
+  }
+
+  return { uid: callerUid, email: callerDoc.data().email };
 }
 
 // Creates a Firebase Auth account plus its Firestore role/profile docs in one
@@ -197,4 +211,58 @@ exports.deleteAccount = onCall(async (request) => {
   }
 
   return { uid, deleted: true };
+});
+
+// A student requests a session with a tutor. Runs server-side (rather than
+// a direct client write) so the double-booking check below is trustworthy —
+// a client-side check-then-write has a race window two students could both
+// slip through.
+exports.requestSession = onCall(async (request) => {
+  const student = await requireStudent(request.auth);
+  const { tutorId, subject, scheduledAt, notes } = request.data || {};
+
+  if (!tutorId || typeof tutorId !== 'string') {
+    throw new HttpsError('invalid-argument', 'A tutor is required.');
+  }
+  if (!subject || typeof subject !== 'string' || !subject.trim()) {
+    throw new HttpsError('invalid-argument', 'A subject is required.');
+  }
+  const scheduledDate = new Date(scheduledAt);
+  if (!scheduledAt || Number.isNaN(scheduledDate.getTime())) {
+    throw new HttpsError('invalid-argument', 'A valid date/time is required.');
+  }
+  if (scheduledDate.getTime() < Date.now()) {
+    throw new HttpsError('invalid-argument', 'Pick a date/time in the future.');
+  }
+
+  const tutorDoc = await db.doc(`tutors/${tutorId}`).get();
+  if (!tutorDoc.exists) {
+    throw new HttpsError('not-found', 'That tutor was not found.');
+  }
+
+  const scheduledTimestamp = Timestamp.fromDate(scheduledDate);
+
+  // Equality-only filters (no orderBy) so this doesn't need a composite
+  // index — there's only ever a couple of sessions per exact timestamp.
+  const existing = await db.collection('sessions')
+    .where('tutorId', '==', tutorId)
+    .where('scheduledAt', '==', scheduledTimestamp)
+    .get();
+  const isTaken = existing.docs.some((docSnap) => ['scheduled', 'pending'].includes(docSnap.data().status));
+  if (isTaken) {
+    throw new HttpsError('already-exists', 'That slot is no longer available. Please pick another time.');
+  }
+
+  const sessionRef = await db.collection('sessions').add({
+    studentId: student.uid,
+    studentEmail: student.email,
+    tutorId,
+    subject: subject.trim(),
+    scheduledAt: scheduledTimestamp,
+    status: 'pending',
+    notes: notes ? String(notes).trim() : '',
+    createdAt: FieldValue.serverTimestamp()
+  });
+
+  return { sessionId: sessionRef.id };
 });
