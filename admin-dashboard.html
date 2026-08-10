@@ -26,6 +26,23 @@
       <h2 id="welcomeMessage">Admin portal</h2>
       <p id="summaryText">Manage tutor profiles and user roles.</p>
 
+      <div class="dashboard-card">
+        <h3>Reporting &amp; oversight</h3>
+        <div id="roleStatTiles" class="stat-tile-row"></div>
+        <div id="sessionStatTiles" class="stat-tile-row"></div>
+      </div>
+
+      <div class="dashboard-grid dashboard-grid-2">
+        <div class="dashboard-card">
+          <h3>Upcoming sessions (next 7 days)</h3>
+          <ul id="upcomingReportList"><li>Loading…</li></ul>
+        </div>
+        <div class="dashboard-card">
+          <h3>Tutors with no sessions logged</h3>
+          <ul id="inactiveTutorsList"><li>Loading…</li></ul>
+        </div>
+      </div>
+
       <div class="dashboard-grid">
         <div class="dashboard-card">
           <h3>Grant a role</h3>
@@ -107,7 +124,62 @@
     const newAccountRole = document.getElementById('newAccountRole');
     const tutorDirectory = document.getElementById('tutorDirectory');
     const accountsDirectory = document.getElementById('accountsDirectory');
+    const roleStatTiles = document.getElementById('roleStatTiles');
+    const sessionStatTiles = document.getElementById('sessionStatTiles');
+    const upcomingReportList = document.getElementById('upcomingReportList');
+    const inactiveTutorsList = document.getElementById('inactiveTutorsList');
     const ROLE_ORDER = ['admin', 'tutor', 'parent', 'student'];
+
+    async function renderReporting() {
+      const [usersSnap, sessionsSnap, tutorsSnap] = await Promise.all([
+        getDocs(collection(db, 'users')),
+        getDocs(collection(db, 'sessions')),
+        getDocs(collection(db, 'tutors'))
+      ]);
+
+      const users = usersSnap.docs.map((d) => d.data());
+      const sessions = sessionsSnap.docs.map((d) => d.data());
+      const tutors = tutorsSnap.docs.map((d) => ({ id: d.id, ...d.data() }));
+
+      const roleCounts = { student: 0, tutor: 0, parent: 0, admin: 0 };
+      users.forEach((u) => { if (roleCounts[u.role] !== undefined) roleCounts[u.role]++; });
+
+      roleStatTiles.innerHTML = `
+        <div class="stat-tile"><span class="stat-value">${roleCounts.student}</span><span class="stat-label">Students</span></div>
+        <div class="stat-tile"><span class="stat-value">${roleCounts.tutor}</span><span class="stat-label">Tutors</span></div>
+        <div class="stat-tile"><span class="stat-value">${roleCounts.parent}</span><span class="stat-label">Parents</span></div>
+        <div class="stat-tile"><span class="stat-value">${roleCounts.admin}</span><span class="stat-label">Admins</span></div>
+      `;
+
+      const statusCounts = { pending: 0, scheduled: 0, completed: 0, cancelled: 0 };
+      sessions.forEach((s) => { if (statusCounts[s.status] !== undefined) statusCounts[s.status]++; });
+
+      sessionStatTiles.innerHTML = `
+        <div class="stat-tile stat-tile-warning"><span class="stat-value">${statusCounts.pending}</span><span class="stat-label">Pending requests</span></div>
+        <div class="stat-tile stat-tile-good"><span class="stat-value">${statusCounts.scheduled}</span><span class="stat-label">Scheduled sessions</span></div>
+        <div class="stat-tile stat-tile-neutral"><span class="stat-value">${statusCounts.completed}</span><span class="stat-label">Completed sessions</span></div>
+        <div class="stat-tile stat-tile-critical"><span class="stat-value">${statusCounts.cancelled}</span><span class="stat-label">Cancelled/declined</span></div>
+      `;
+
+      const tutorNameById = Object.fromEntries(tutors.map((t) => [t.id, t.name]));
+      const now = new Date();
+      const weekFromNow = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
+      const upcoming = sessions
+        .filter((s) => s.status === 'scheduled' && s.scheduledAt && s.scheduledAt.toDate() >= now && s.scheduledAt.toDate() <= weekFromNow)
+        .sort((a, b) => a.scheduledAt.toDate() - b.scheduledAt.toDate());
+
+      upcomingReportList.innerHTML = upcoming.length
+        ? upcoming.map((s) => `<li>${s.studentEmail || 'Student'} with ${tutorNameById[s.tutorId] || 'tutor'} — ${s.subject} — ${s.scheduledAt.toDate().toLocaleString()}</li>`).join('')
+        : '<li>Nothing scheduled in the next 7 days.</li>';
+
+      const tutorSessionCounts = {};
+      sessions.forEach((s) => { tutorSessionCounts[s.tutorId] = (tutorSessionCounts[s.tutorId] || 0) + 1; });
+      const inactiveTutors = tutors.filter((t) => !tutorSessionCounts[t.id]);
+
+      inactiveTutorsList.innerHTML = inactiveTutors.length
+        ? inactiveTutors.map((t) => `<li>${t.name} — ${t.email}</li>`).join('')
+        : '<li>Every tutor has at least one session logged.</li>';
+    }
 
     function updateRoleFields() {
       const role = newAccountRole.value;
@@ -190,6 +262,7 @@
         await updateDoc(doc(db, 'users', uid), updates);
         await renderAccountsDirectory();
         await renderTutorDirectory();
+        await renderReporting();
         return;
       }
 
@@ -207,6 +280,7 @@
         await deleteAccountCallable({ uid });
         await renderAccountsDirectory();
         await renderTutorDirectory();
+        await renderReporting();
       }
     });
 
@@ -308,6 +382,7 @@
           await renderTutorDirectory();
         }
         await renderAccountsDirectory();
+        await renderReporting();
       } catch (error) {
         createAccountResult.innerHTML = `<p>${error.message || 'Could not create the account.'}</p>`;
       }
@@ -336,6 +411,7 @@
       summaryText.textContent = 'Your admin account is ready.';
       renderTutorDirectory();
       renderAccountsDirectory();
+      renderReporting();
     });
 
     signOutBtn.addEventListener('click', async () => {

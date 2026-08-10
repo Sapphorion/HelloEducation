@@ -234,8 +234,71 @@ navigation a:hover {
   font-weight: 700;
 }
 
-.dashboard-grid:has(.admin-form) {
+.dashboard-grid:has(.admin-form),
+.dashboard-grid-2 {
   grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.stat-tile-row {
+  display: flex;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+  margin: 0.75rem 0;
+}
+
+.stat-tile {
+  flex: 1;
+  min-width: 130px;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  padding: 0.9rem 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+}
+
+.stat-value {
+  font-size: 1.8rem;
+  font-weight: 700;
+  color: #0f172a;
+  line-height: 1.1;
+}
+
+.stat-label {
+  font-size: 0.8rem;
+  color: #64748b;
+}
+
+.stat-tile-warning {
+  background: #fef3c7;
+  border-color: #fde68a;
+}
+
+.stat-tile-warning .stat-value {
+  color: #92400e;
+}
+
+.stat-tile-good {
+  background: #dcfce7;
+  border-color: #bbf7d0;
+}
+
+.stat-tile-good .stat-value {
+  color: #15803d;
+}
+
+.stat-tile-neutral .stat-value {
+  color: #334155;
+}
+
+.stat-tile-critical {
+  background: #fee2e2;
+  border-color: #fecaca;
+}
+
+.stat-tile-critical .stat-value {
+  color: #b91c1c;
 }
 
 .card-hint {
