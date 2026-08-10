@@ -28,17 +28,20 @@
 
       <div class="dashboard-card">
         <h3>Reporting &amp; oversight</h3>
-        <div id="roleStatTiles" class="stat-tile-row"></div>
-        <div id="sessionStatTiles" class="stat-tile-row"></div>
-      </div>
+        <div class="auth-tabs report-tabs" role="tablist" aria-label="Reporting view">
+          <button class="auth-tab active" type="button" data-report-tab="overview">Overview</button>
+          <button class="auth-tab" type="button" data-report-tab="upcoming">Upcoming Sessions</button>
+          <button class="auth-tab" type="button" data-report-tab="inactive">Inactive Tutors</button>
+        </div>
 
-      <div class="dashboard-grid dashboard-grid-2">
-        <div class="dashboard-card">
-          <h3>Upcoming sessions (next 7 days)</h3>
+        <div class="report-panel" data-report-panel="overview">
+          <div id="roleStatTiles" class="stat-tile-row"></div>
+          <div id="sessionStatTiles" class="stat-tile-row"></div>
+        </div>
+        <div class="report-panel" data-report-panel="upcoming" hidden>
           <ul id="upcomingReportList"><li>Loading…</li></ul>
         </div>
-        <div class="dashboard-card">
-          <h3>Tutors with no sessions logged</h3>
+        <div class="report-panel" data-report-panel="inactive" hidden>
           <ul id="inactiveTutorsList"><li>Loading…</li></ul>
         </div>
       </div>
@@ -146,6 +149,15 @@
     const upcomingReportList = document.getElementById('upcomingReportList');
     const inactiveTutorsList = document.getElementById('inactiveTutorsList');
     const ROLE_ORDER = ['admin', 'tutor', 'parent', 'student'];
+
+    document.querySelectorAll('[data-report-tab]').forEach((tabButton) => {
+      tabButton.addEventListener('click', () => {
+        document.querySelectorAll('[data-report-tab]').forEach((btn) => btn.classList.toggle('active', btn === tabButton));
+        document.querySelectorAll('[data-report-panel]').forEach((panel) => {
+          panel.hidden = panel.dataset.reportPanel !== tabButton.dataset.reportTab;
+        });
+      });
+    });
 
     async function renderReporting() {
       const [usersSnap, sessionsSnap, tutorsSnap] = await Promise.all([

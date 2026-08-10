@@ -239,6 +239,14 @@ navigation a:hover {
   grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
+.report-tabs {
+  margin-bottom: 0;
+}
+
+.report-panel {
+  margin-top: 1rem;
+}
+
 .stat-tile-row {
   display: flex;
   gap: 0.75rem;
