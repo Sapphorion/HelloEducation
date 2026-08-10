@@ -71,6 +71,17 @@
         <ul id="progressList"><li>Loading…</li></ul>
       </div>
 
+      <div class="dashboard-card">
+        <h3>AI Homework Helper</h3>
+        <p class="card-hint">An AI assistant you can use between sessions for homework help. It's not your tutor — for anything important, use "Ask a tutor" below instead.</p>
+        <ul id="aiChatLog" class="ai-chat-log"><li>Loading…</li></ul>
+        <form id="aiChatForm" class="admin-form">
+          <textarea id="aiChatInput" placeholder="Ask a question…" rows="2" required></textarea>
+          <button type="submit">Send</button>
+        </form>
+        <p class="auth-feedback" id="aiChatFeedback"></p>
+      </div>
+
       <div class="dashboard-grid dashboard-grid-2">
         <div class="dashboard-card">
           <h3>Ask a tutor</h3>
@@ -119,6 +130,7 @@
     const functions = getFunctions(app);
     const storage = getStorage(app);
     const requestSessionCallable = httpsCallable(functions, 'requestSession');
+    const askAICallable = httpsCallable(functions, 'askAI');
     const welcomeMessage = document.getElementById('welcomeMessage');
     const summaryText = document.getElementById('summaryText');
     const taskList = document.getElementById('taskList');
@@ -136,7 +148,64 @@
     const askTutor = document.getElementById('askTutor');
     const askFeedback = document.getElementById('askFeedback');
     const questionsList = document.getElementById('questionsList');
+    const aiChatLog = document.getElementById('aiChatLog');
+    const aiChatForm = document.getElementById('aiChatForm');
+    const aiChatInput = document.getElementById('aiChatInput');
+    const aiChatFeedback = document.getElementById('aiChatFeedback');
     const signOutBtn = document.getElementById('signOutBtn');
+
+    function appendChatBubble(role, content) {
+      const li = document.createElement('li');
+      li.className = role === 'user' ? 'ai-chat-bubble ai-chat-user' : 'ai-chat-bubble ai-chat-assistant';
+      li.textContent = content;
+      aiChatLog.appendChild(li);
+      aiChatLog.scrollTop = aiChatLog.scrollHeight;
+    }
+
+    async function renderAIChat() {
+      if (!auth.currentUser) return;
+      const messagesQuery = query(
+        collection(db, 'aiConversations', auth.currentUser.uid, 'messages'),
+        orderBy('createdAt', 'asc')
+      );
+      const snapshot = await getDocs(messagesQuery);
+
+      if (snapshot.empty) {
+        aiChatLog.innerHTML = '<li>Ask a question to get started.</li>';
+        return;
+      }
+
+      aiChatLog.innerHTML = '';
+      snapshot.docs.forEach((docSnap) => {
+        const m = docSnap.data();
+        appendChatBubble(m.role, m.content);
+      });
+    }
+
+    aiChatForm.addEventListener('submit', async (event) => {
+      event.preventDefault();
+      const message = aiChatInput.value.trim();
+      if (!message) return;
+
+      if (!aiChatLog.querySelector('.ai-chat-bubble')) {
+        aiChatLog.innerHTML = '';
+      }
+      appendChatBubble('user', message);
+      aiChatInput.value = '';
+      aiChatFeedback.textContent = 'Thinking…';
+      const submitBtn = aiChatForm.querySelector('button[type="submit"]');
+      submitBtn.disabled = true;
+
+      try {
+        const response = await askAICallable({ message });
+        appendChatBubble('assistant', response.data.reply);
+        aiChatFeedback.textContent = '';
+      } catch (error) {
+        aiChatFeedback.textContent = error.message || 'Could not reach the AI assistant.';
+      } finally {
+        submitBtn.disabled = false;
+      }
+    });
 
     async function renderSessions() {
       if (!auth.currentUser) return;
@@ -367,6 +436,7 @@
       renderResources();
       renderSessions();
       renderQuestions();
+      renderAIChat();
       populateTutorSelect();
     });
 

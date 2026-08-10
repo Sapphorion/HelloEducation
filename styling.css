@@ -206,6 +206,33 @@ navigation a:hover {
   color: #64748b;
 }
 
+.ai-chat-log {
+  max-height: 320px;
+  overflow-y: auto;
+  margin-bottom: 0.7rem !important;
+}
+
+.ai-chat-bubble {
+  max-width: 80%;
+  display: block !important;
+  padding: 0.55rem 0.8rem;
+  border-radius: 12px;
+  line-height: 1.4;
+  white-space: pre-wrap;
+}
+
+.ai-chat-user {
+  align-self: flex-end;
+  background: #2563eb;
+  color: white;
+}
+
+.ai-chat-assistant {
+  align-self: flex-start;
+  background: #f1f5f9;
+  color: #1e293b;
+}
+
 .dashboard-actions {
   display: flex;
   gap: 0.4rem;

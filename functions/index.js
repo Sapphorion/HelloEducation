@@ -1,11 +1,15 @@
 const { onCall, HttpsError } = require('firebase-functions/v2/https');
 const { setGlobalOptions } = require('firebase-functions/v2');
+const { defineSecret } = require('firebase-functions/params');
 const { initializeApp } = require('firebase-admin/app');
 const { getFirestore, FieldValue, Timestamp } = require('firebase-admin/firestore');
 const { getAuth } = require('firebase-admin/auth');
+const Anthropic = require('@anthropic-ai/sdk');
 
 initializeApp();
 setGlobalOptions({ maxInstances: 5 });
+
+const anthropicApiKey = defineSecret('ANTHROPIC_API_KEY');
 
 const db = getFirestore();
 const auth = getAuth();
@@ -38,7 +42,7 @@ async function requireStudent(requestAuth) {
 
   const callerDoc = await db.doc(`users/${callerUid}`).get();
   if (!callerDoc.exists || callerDoc.data().role !== 'student') {
-    throw new HttpsError('permission-denied', 'Only a student can request a session.');
+    throw new HttpsError('permission-denied', 'Only a student can do this.');
   }
 
   return { uid: callerUid, email: callerDoc.data().email };
@@ -265,4 +269,77 @@ exports.requestSession = onCall(async (request) => {
   });
 
   return { sessionId: sessionRef.id };
+});
+
+const AI_SYSTEM_PROMPT = `You are a friendly, patient homework helper for HelloEducation, a tutoring service for school-age students. Help with any subject the student asks about: explain concepts clearly, work through problems step by step, and encourage understanding rather than just handing over final answers when it helps their learning.
+
+Keep responses age-appropriate, encouraging, and reasonably concise. If a student asks about something harmful, unsafe, or inappropriate, or something unrelated to schoolwork or learning, gently decline and suggest they speak with their tutor or a trusted adult instead.
+
+You are not a replacement for their tutor. For anything requiring real judgment — grades, personal issues, scheduling, disputes — tell them to contact their tutor or the HelloEducation admin.`;
+
+const AI_DAILY_MESSAGE_LIMIT = 40;
+const AI_HISTORY_LOOKBACK = 10;
+
+// Student-facing homework helper chatbot. Only callable by a student — checks
+// and increments a per-student daily message count in the same transaction
+// so concurrent requests can't slip past the cap, then calls the Anthropic
+// API with a short window of prior turns for context.
+exports.askAI = onCall({ secrets: [anthropicApiKey] }, async (request) => {
+  const student = await requireStudent(request.auth);
+
+  const message = (request.data?.message || '').trim();
+  if (!message) {
+    throw new HttpsError('invalid-argument', 'A message is required.');
+  }
+  if (message.length > 2000) {
+    throw new HttpsError('invalid-argument', 'Message is too long (2000 characters max).');
+  }
+
+  const today = new Date().toISOString().slice(0, 10);
+  const usageRef = db.doc(`aiUsage/${student.uid}`);
+
+  await db.runTransaction(async (tx) => {
+    const usageDoc = await tx.get(usageRef);
+    const data = usageDoc.exists ? usageDoc.data() : {};
+    const count = data.date === today ? (data.count || 0) : 0;
+
+    if (count >= AI_DAILY_MESSAGE_LIMIT) {
+      throw new HttpsError(
+        'resource-exhausted',
+        `You've reached today's limit of ${AI_DAILY_MESSAGE_LIMIT} messages. Try again tomorrow, or ask your tutor.`
+      );
+    }
+
+    tx.set(usageRef, { date: today, count: count + 1 }, { merge: true });
+  });
+
+  const messagesRef = db.collection(`aiConversations/${student.uid}/messages`);
+  const historySnap = await messagesRef.orderBy('createdAt', 'desc').limit(AI_HISTORY_LOOKBACK).get();
+  const history = historySnap.docs
+    .map((docSnap) => docSnap.data())
+    .reverse()
+    .map((m) => ({ role: m.role, content: m.content }));
+
+  const anthropic = new Anthropic({ apiKey: anthropicApiKey.value() });
+
+  let replyText;
+  try {
+    const response = await anthropic.messages.create({
+      model: 'claude-haiku-4-5',
+      max_tokens: 1024,
+      system: AI_SYSTEM_PROMPT,
+      messages: [...history, { role: 'user', content: message }]
+    });
+    const textBlock = response.content.find((block) => block.type === 'text');
+    replyText = textBlock ? textBlock.text : "Sorry, I couldn't come up with a response — try asking again.";
+  } catch (error) {
+    throw new HttpsError('internal', 'Could not reach the AI assistant. Please try again in a moment.');
+  }
+
+  const batch = db.batch();
+  batch.set(messagesRef.doc(), { role: 'user', content: message, createdAt: FieldValue.serverTimestamp() });
+  batch.set(messagesRef.doc(), { role: 'assistant', content: replyText, createdAt: FieldValue.serverTimestamp() });
+  await batch.commit();
+
+  return { reply: replyText };
 });

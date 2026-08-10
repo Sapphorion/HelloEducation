@@ -149,6 +149,19 @@ service cloud.firestore {
       allow delete: if isAdmin(request.auth.uid) || resource.data.studentId == request.auth.uid;
     }
 
+    // AI homework-helper chat transcript. Written only by the askAI Cloud
+    // Function via the Admin SDK (bypasses these rules) — no client write
+    // path, since the transcript must stay paired with the rate-limit check.
+    match /aiConversations/{studentId}/messages/{messageId} {
+      allow read: if signedIn() && (request.auth.uid == studentId || isAdmin(request.auth.uid));
+    }
+
+    // Per-student daily message counter for the AI homework helper. Same
+    // Admin-SDK-only write pattern as above.
+    match /aiUsage/{studentId} {
+      allow read: if signedIn() && (request.auth.uid == studentId || isAdmin(request.auth.uid));
+    }
+
     match /dashboardData/{docId} {
       allow read: if signedIn() && (isAdmin(request.auth.uid) || isStudent(request.auth.uid) || isTutor(request.auth.uid));
       allow write: if isAdmin(request.auth.uid);
