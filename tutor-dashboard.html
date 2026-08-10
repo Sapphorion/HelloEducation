@@ -106,6 +106,11 @@
         <p class="auth-feedback" id="resourceFeedback"></p>
       </div>
 
+      <div class="dashboard-card">
+        <h3>Questions from students</h3>
+        <ul id="questionsList"><li>Loading…</li></ul>
+      </div>
+
       <button id="signOutBtn" type="button">Sign Out</button>
     </section>
   </main>
@@ -140,7 +145,49 @@
     const assignForm = document.getElementById('assignForm');
     const assignFeedback = document.getElementById('assignFeedback');
     const assignmentsList = document.getElementById('assignmentsList');
+    const questionsList = document.getElementById('questionsList');
     const signOutBtn = document.getElementById('signOutBtn');
+
+    async function renderQuestions() {
+      if (!auth.currentUser) return;
+      const questionsQuery = query(collection(db, 'questions'), where('tutorId', '==', auth.currentUser.uid));
+      const snapshot = await getDocs(questionsQuery);
+      const questions = snapshot.docs
+        .map((docSnap) => ({ id: docSnap.id, ...docSnap.data() }))
+        .sort((a, b) => (b.createdAt?.toMillis() || 0) - (a.createdAt?.toMillis() || 0));
+
+      questionsList.innerHTML = questions.length
+        ? questions.map((q) => `
+          <li>
+            <div>
+              <strong>${q.subject}</strong> — ${q.studentEmail} <span class="status-badge">${q.status}</span>
+              <br>${q.message}
+              ${q.reply ? `<br>Your reply: ${q.reply}` : ''}
+            </div>
+            ${q.status === 'open' ? `
+              <div class="dashboard-actions">
+                <input type="text" placeholder="Reply" data-reply-input="${q.id}" />
+                <button class="action-btn" data-send-reply="${q.id}" type="button">Send reply</button>
+              </div>
+            ` : ''}
+          </li>
+        `).join('')
+        : '<li>No questions yet.</li>';
+    }
+
+    questionsList.addEventListener('click', async (event) => {
+      const button = event.target.closest('button[data-send-reply]');
+      if (!button) return;
+      const replyInput = questionsList.querySelector(`input[data-reply-input="${button.dataset.sendReply}"]`);
+      const reply = replyInput.value.trim();
+      if (!reply) return;
+      await updateDoc(doc(db, 'questions', button.dataset.sendReply), {
+        reply,
+        status: 'answered',
+        repliedAt: serverTimestamp()
+      });
+      await renderQuestions();
+    });
 
     let allMyAssignments = [];
 
@@ -402,6 +449,7 @@
       renderMySessions();
       renderAvailability();
       renderAssignments();
+      renderQuestions();
     });
 
     signOutBtn.addEventListener('click', async () => {
