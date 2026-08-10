@@ -97,6 +97,44 @@ service cloud.firestore {
       allow delete: if isAdmin(request.auth.uid) || resource.data.tutorId == request.auth.uid;
     }
 
+    // Tutor/admin assigns work to a student; the student submits a text note
+    // and/or a file (the file itself lives in Cloud Storage — see
+    // storage.rules — this doc just carries its download URL once uploaded).
+    match /assignments/{assignmentId} {
+      allow read: if signedIn() && (
+        resource.data.studentId == request.auth.uid
+        || resource.data.createdBy == request.auth.uid
+        || isAdmin(request.auth.uid)
+        || isParentOf(resource.data.studentId)
+      );
+      allow create: if signedIn() && (
+        isAdmin(request.auth.uid)
+        || (isTutor(request.auth.uid) && request.resource.data.createdBy == request.auth.uid)
+      );
+      allow update: if signedIn() && (
+        isAdmin(request.auth.uid)
+        || resource.data.createdBy == request.auth.uid
+        || resource.data.studentId == request.auth.uid
+      );
+      allow delete: if isAdmin(request.auth.uid) || resource.data.createdBy == request.auth.uid;
+    }
+
+    // Study resources (links) tutor/admin shares with a specific student.
+    match /studyResources/{resourceId} {
+      allow read: if signedIn() && (
+        resource.data.studentId == request.auth.uid
+        || resource.data.createdBy == request.auth.uid
+        || isAdmin(request.auth.uid)
+        || isParentOf(resource.data.studentId)
+      );
+      allow create: if signedIn() && (
+        isAdmin(request.auth.uid)
+        || (isTutor(request.auth.uid) && request.resource.data.createdBy == request.auth.uid)
+      );
+      allow update: if signedIn() && (isAdmin(request.auth.uid) || resource.data.createdBy == request.auth.uid);
+      allow delete: if isAdmin(request.auth.uid) || resource.data.createdBy == request.auth.uid;
+    }
+
     match /dashboardData/{docId} {
       allow read: if signedIn() && (isAdmin(request.auth.uid) || isStudent(request.auth.uid) || isTutor(request.auth.uid));
       allow write: if isAdmin(request.auth.uid);

@@ -1,0 +1,25 @@
+rules_version = '2';
+service firebase.storage {
+  match /b/{bucket}/o {
+    // Assignment submission files. Path encodes the owning student directly
+    // so writes can be checked without a cross-product lookup; reads for the
+    // assigning tutor/admin cross-reference the Firestore assignment doc.
+    match /assignment-submissions/{studentId}/{assignmentId}/{fileName} {
+      function assignmentDoc() {
+        return firestore.get(/databases/(default)/documents/assignments/$(assignmentId));
+      }
+      function isAdmin() {
+        return firestore.get(/databases/(default)/documents/users/$(request.auth.uid)).data.role == 'admin';
+      }
+
+      allow read: if request.auth != null && (
+        request.auth.uid == studentId
+        || assignmentDoc().data.createdBy == request.auth.uid
+        || isAdmin()
+      );
+      allow write: if request.auth != null
+        && request.auth.uid == studentId
+        && request.resource.size < 10 * 1024 * 1024;
+    }
+  }
+}

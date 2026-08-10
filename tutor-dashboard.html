@@ -76,6 +76,36 @@
         <ul id="mySessionsList"><li>Loading…</li></ul>
       </div>
 
+      <div class="dashboard-grid dashboard-grid-2">
+        <div class="dashboard-card">
+          <h3>Assign work</h3>
+          <p class="card-hint">Shows up on the student's "Today's focus" list. They can submit a note and/or a file back to you.</p>
+          <form id="assignForm" class="admin-form">
+            <input id="assignStudentEmail" type="email" placeholder="Student email" required />
+            <input id="assignTitle" type="text" placeholder="Title (e.g. Algebra worksheet)" required />
+            <textarea id="assignDescription" placeholder="Instructions (optional)" rows="2"></textarea>
+            <button type="submit">Assign</button>
+          </form>
+          <p class="auth-feedback" id="assignFeedback"></p>
+        </div>
+        <div class="dashboard-card">
+          <h3>Assignments I've given</h3>
+          <ul id="assignmentsList"><li>Loading…</li></ul>
+        </div>
+      </div>
+
+      <div class="dashboard-card">
+        <h3>Share a study resource</h3>
+        <form id="resourceForm" class="admin-form">
+          <input id="resourceStudentEmail" type="email" placeholder="Student email" required />
+          <input id="resourceTitle" type="text" placeholder="Title (e.g. GCSE Maths formula sheet)" required />
+          <input id="resourceType" type="text" placeholder="Type (e.g. PDF, Link, Worksheet)" required />
+          <input id="resourceUrl" type="url" placeholder="Link (optional)" />
+          <button type="submit">Share</button>
+        </form>
+        <p class="auth-feedback" id="resourceFeedback"></p>
+      </div>
+
       <button id="signOutBtn" type="button">Sign Out</button>
     </section>
   </main>
@@ -107,7 +137,119 @@
     const logSessionForm = document.getElementById('logSessionForm');
     const sessionFeedback = document.getElementById('sessionFeedback');
     const mySessionsList = document.getElementById('mySessionsList');
+    const assignForm = document.getElementById('assignForm');
+    const assignFeedback = document.getElementById('assignFeedback');
+    const assignmentsList = document.getElementById('assignmentsList');
     const signOutBtn = document.getElementById('signOutBtn');
+
+    let allMyAssignments = [];
+
+    async function renderAssignments() {
+      if (!auth.currentUser) return;
+      const assignmentsQuery = query(collection(db, 'assignments'), where('createdBy', '==', auth.currentUser.uid));
+      const snapshot = await getDocs(assignmentsQuery);
+      allMyAssignments = snapshot.docs
+        .map((docSnap) => ({ id: docSnap.id, ...docSnap.data() }))
+        .sort((a, b) => (b.createdAt?.toMillis() || 0) - (a.createdAt?.toMillis() || 0));
+
+      assignmentsList.innerHTML = allMyAssignments.length
+        ? allMyAssignments.map((a) => `
+          <li>
+            <div>
+              <strong>${a.title}</strong> — ${a.studentEmail || 'Student'} <span class="status-badge">${a.status}</span>
+              ${a.description ? `<br>${a.description}` : ''}
+              ${a.status !== 'assigned' ? `<br>Submission: ${a.submissionNote || '(no note)'}${a.fileUrl ? ` — <a href="${a.fileUrl}" target="_blank" rel="noopener">${a.fileName || 'View file'}</a>` : ''}` : ''}
+              ${a.feedback ? `<br>Your feedback: ${a.feedback}` : ''}
+            </div>
+            ${a.status === 'submitted' ? `
+              <div class="dashboard-actions">
+                <input type="text" placeholder="Feedback" data-feedback-input="${a.id}" />
+                <button class="action-btn" data-mark-reviewed="${a.id}" type="button">Mark reviewed</button>
+              </div>
+            ` : ''}
+          </li>
+        `).join('')
+        : '<li>No assignments given yet.</li>';
+    }
+
+    assignForm.addEventListener('submit', async (event) => {
+      event.preventDefault();
+      assignFeedback.textContent = 'Assigning…';
+
+      const studentEmail = document.getElementById('assignStudentEmail').value.trim();
+      const title = document.getElementById('assignTitle').value.trim();
+      const description = document.getElementById('assignDescription').value.trim();
+
+      const studentQuery = query(collection(db, 'users'), where('email', '==', studentEmail), where('role', '==', 'student'));
+      const studentSnap = await getDocs(studentQuery);
+
+      if (studentSnap.empty) {
+        assignFeedback.textContent = 'No student account found with that email.';
+        return;
+      }
+
+      await addDoc(collection(db, 'assignments'), {
+        studentId: studentSnap.docs[0].id,
+        studentEmail,
+        title,
+        description,
+        status: 'assigned',
+        submissionNote: '',
+        fileUrl: null,
+        fileName: null,
+        feedback: '',
+        createdBy: auth.currentUser.uid,
+        createdAt: serverTimestamp()
+      });
+
+      assignFeedback.textContent = 'Assigned.';
+      assignForm.reset();
+      await renderAssignments();
+    });
+
+    document.getElementById('resourceForm').addEventListener('submit', async (event) => {
+      event.preventDefault();
+      const resourceFeedback = document.getElementById('resourceFeedback');
+      resourceFeedback.textContent = 'Sharing…';
+
+      const studentEmail = document.getElementById('resourceStudentEmail').value.trim();
+      const title = document.getElementById('resourceTitle').value.trim();
+      const type = document.getElementById('resourceType').value.trim();
+      const url = document.getElementById('resourceUrl').value.trim();
+
+      const studentQuery = query(collection(db, 'users'), where('email', '==', studentEmail), where('role', '==', 'student'));
+      const studentSnap = await getDocs(studentQuery);
+
+      if (studentSnap.empty) {
+        resourceFeedback.textContent = 'No student account found with that email.';
+        return;
+      }
+
+      await addDoc(collection(db, 'studyResources'), {
+        studentId: studentSnap.docs[0].id,
+        studentEmail,
+        title,
+        type,
+        url: url || null,
+        createdBy: auth.currentUser.uid,
+        createdAt: serverTimestamp()
+      });
+
+      resourceFeedback.textContent = 'Shared.';
+      event.target.reset();
+    });
+
+    assignmentsList.addEventListener('click', async (event) => {
+      const button = event.target.closest('button[data-mark-reviewed]');
+      if (!button) return;
+      const feedbackInput = assignmentsList.querySelector(`input[data-feedback-input="${button.dataset.markReviewed}"]`);
+      await updateDoc(doc(db, 'assignments', button.dataset.markReviewed), {
+        status: 'reviewed',
+        feedback: feedbackInput.value.trim(),
+        reviewedAt: serverTimestamp()
+      });
+      await renderAssignments();
+    });
 
     let allMySessions = [];
 
@@ -259,6 +401,7 @@
       welcomeMessage.textContent = `Welcome back, ${user.email || 'tutor'}!`;
       renderMySessions();
       renderAvailability();
+      renderAssignments();
     });
 
     signOutBtn.addEventListener('click', async () => {

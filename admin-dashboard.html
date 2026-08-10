@@ -80,6 +80,30 @@
       </div>
 
       <div class="dashboard-card">
+        <h3>Assign work to a student</h3>
+        <p class="card-hint">Same assignment system tutors use — shows up on the student's "Today's focus" list.</p>
+        <form id="adminAssignForm" class="admin-form">
+          <input id="adminAssignStudentEmail" type="email" placeholder="Student email" required />
+          <input id="adminAssignTitle" type="text" placeholder="Title" required />
+          <textarea id="adminAssignDescription" placeholder="Instructions (optional)" rows="2"></textarea>
+          <button type="submit">Assign</button>
+        </form>
+        <p class="auth-feedback" id="adminAssignFeedback"></p>
+      </div>
+
+      <div class="dashboard-card">
+        <h3>Share a study resource</h3>
+        <form id="adminResourceForm" class="admin-form">
+          <input id="adminResourceStudentEmail" type="email" placeholder="Student email" required />
+          <input id="adminResourceTitle" type="text" placeholder="Title" required />
+          <input id="adminResourceType" type="text" placeholder="Type (e.g. PDF, Link, Worksheet)" required />
+          <input id="adminResourceUrl" type="url" placeholder="Link (optional)" />
+          <button type="submit">Share</button>
+        </form>
+        <p class="auth-feedback" id="adminResourceFeedback"></p>
+      </div>
+
+      <div class="dashboard-card">
         <h3>Current tutors</h3>
         <ul id="tutorDirectory"><li>Loading…</li></ul>
       </div>
@@ -115,7 +139,7 @@
   <script type="module">
     import { initializeApp } from 'https://www.gstatic.com/firebasejs/12.4.0/firebase-app.js';
     import { getAuth, onAuthStateChanged, signOut } from 'https://www.gstatic.com/firebasejs/12.4.0/firebase-auth.js';
-    import { getFirestore, collection, query, where, getDocs, updateDoc, doc, deleteDoc } from 'https://www.gstatic.com/firebasejs/12.4.0/firebase-firestore.js';
+    import { getFirestore, collection, query, where, getDocs, updateDoc, doc, deleteDoc, addDoc, serverTimestamp } from 'https://www.gstatic.com/firebasejs/12.4.0/firebase-firestore.js';
     import { getFunctions, httpsCallable } from 'https://www.gstatic.com/firebasejs/12.4.0/firebase-functions.js';
     import { firebaseConfig, isFirebaseConfigured } from './firebase-config.js';
 
@@ -148,7 +172,75 @@
     const sessionStatTiles = document.getElementById('sessionStatTiles');
     const upcomingReportList = document.getElementById('upcomingReportList');
     const inactiveTutorsList = document.getElementById('inactiveTutorsList');
+    const adminAssignForm = document.getElementById('adminAssignForm');
+    const adminAssignFeedback = document.getElementById('adminAssignFeedback');
     const ROLE_ORDER = ['admin', 'tutor', 'parent', 'student'];
+
+    adminAssignForm.addEventListener('submit', async (event) => {
+      event.preventDefault();
+      adminAssignFeedback.textContent = 'Assigning…';
+
+      const studentEmail = document.getElementById('adminAssignStudentEmail').value.trim();
+      const title = document.getElementById('adminAssignTitle').value.trim();
+      const description = document.getElementById('adminAssignDescription').value.trim();
+
+      const studentQuery = query(collection(db, 'users'), where('email', '==', studentEmail), where('role', '==', 'student'));
+      const studentSnap = await getDocs(studentQuery);
+
+      if (studentSnap.empty) {
+        adminAssignFeedback.textContent = 'No student account found with that email.';
+        return;
+      }
+
+      await addDoc(collection(db, 'assignments'), {
+        studentId: studentSnap.docs[0].id,
+        studentEmail,
+        title,
+        description,
+        status: 'assigned',
+        submissionNote: '',
+        fileUrl: null,
+        fileName: null,
+        feedback: '',
+        createdBy: auth.currentUser.uid,
+        createdAt: serverTimestamp()
+      });
+
+      adminAssignFeedback.textContent = 'Assigned.';
+      adminAssignForm.reset();
+    });
+
+    document.getElementById('adminResourceForm').addEventListener('submit', async (event) => {
+      event.preventDefault();
+      const resourceFeedback = document.getElementById('adminResourceFeedback');
+      resourceFeedback.textContent = 'Sharing…';
+
+      const studentEmail = document.getElementById('adminResourceStudentEmail').value.trim();
+      const title = document.getElementById('adminResourceTitle').value.trim();
+      const type = document.getElementById('adminResourceType').value.trim();
+      const url = document.getElementById('adminResourceUrl').value.trim();
+
+      const studentQuery = query(collection(db, 'users'), where('email', '==', studentEmail), where('role', '==', 'student'));
+      const studentSnap = await getDocs(studentQuery);
+
+      if (studentSnap.empty) {
+        resourceFeedback.textContent = 'No student account found with that email.';
+        return;
+      }
+
+      await addDoc(collection(db, 'studyResources'), {
+        studentId: studentSnap.docs[0].id,
+        studentEmail,
+        title,
+        type,
+        url: url || null,
+        createdBy: auth.currentUser.uid,
+        createdAt: serverTimestamp()
+      });
+
+      resourceFeedback.textContent = 'Shared.';
+      event.target.reset();
+    });
 
     document.querySelectorAll('[data-report-tab]').forEach((tabButton) => {
       tabButton.addEventListener('click', () => {
