@@ -247,7 +247,8 @@ navigation a:hover {
 }
 
 .admin-form input,
-.admin-form textarea {
+.admin-form textarea,
+.admin-form select {
   padding: 0.6rem 0.75rem;
   border: 1px solid #cbd5e1;
   border-radius: 8px;

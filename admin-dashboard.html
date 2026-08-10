@@ -37,16 +37,23 @@
           <div id="roleLookupResult" class="admin-result"></div>
         </div>
         <div class="dashboard-card">
-          <h3>Add a tutor profile</h3>
-          <p class="card-hint">Adds a public tutor listing. This does not create their login — create their Firebase Auth account first, then have them sign in on the Student tab and grant them the tutor role above.</p>
-          <form id="addTutorForm" class="admin-form">
-            <input id="tutorName" type="text" placeholder="Name" required />
-            <input id="tutorEmail" type="email" placeholder="Email" required />
-            <input id="tutorSubject" type="text" placeholder="Subject" required />
-            <textarea id="tutorBio" placeholder="Short bio" rows="2"></textarea>
-            <button type="submit">Add tutor</button>
+          <h3>Create an account</h3>
+          <p class="card-hint">Creates their login and profile in one step. Leave the password blank to auto-generate a temporary one to share with them.</p>
+          <form id="createAccountForm" class="admin-form">
+            <select id="newAccountRole" required>
+              <option value="student">Student</option>
+              <option value="tutor">Tutor</option>
+              <option value="admin">Admin</option>
+            </select>
+            <input id="newAccountName" type="text" placeholder="Name" required />
+            <input id="newAccountEmail" type="email" placeholder="Email" required />
+            <input id="newAccountPassword" type="password" placeholder="Password (optional — auto-generated if blank)" />
+            <input id="newAccountSubject" type="text" placeholder="Subject" class="tutor-only" />
+            <textarea id="newAccountBio" placeholder="Short bio" rows="2" class="tutor-only"></textarea>
+            <input id="newAccountGrade" type="text" placeholder="Grade" class="student-only" />
+            <button type="submit">Create account</button>
           </form>
-          <p class="auth-feedback" id="tutorFeedback"></p>
+          <div class="admin-result" id="createAccountResult"></div>
         </div>
       </div>
 
@@ -66,7 +73,8 @@
   <script type="module">
     import { initializeApp } from 'https://www.gstatic.com/firebasejs/12.4.0/firebase-app.js';
     import { getAuth, onAuthStateChanged, signOut } from 'https://www.gstatic.com/firebasejs/12.4.0/firebase-auth.js';
-    import { getFirestore, collection, query, where, getDocs, updateDoc, doc, addDoc, deleteDoc } from 'https://www.gstatic.com/firebasejs/12.4.0/firebase-firestore.js';
+    import { getFirestore, collection, query, where, getDocs, updateDoc, doc, deleteDoc } from 'https://www.gstatic.com/firebasejs/12.4.0/firebase-firestore.js';
+    import { getFunctions, httpsCallable } from 'https://www.gstatic.com/firebasejs/12.4.0/firebase-functions.js';
     import { firebaseConfig, isFirebaseConfigured } from './firebase-config.js';
 
     const role = localStorage.getItem('helloEducationRole');
@@ -77,14 +85,25 @@
     const app = initializeApp(firebaseConfig);
     const auth = getAuth(app);
     const db = getFirestore(app);
+    const functions = getFunctions(app);
+    const createAccountCallable = httpsCallable(functions, 'createAccount');
     const welcomeMessage = document.getElementById('welcomeMessage');
     const summaryText = document.getElementById('summaryText');
     const signOutBtn = document.getElementById('signOutBtn');
     const roleLookupForm = document.getElementById('roleLookupForm');
     const roleLookupResult = document.getElementById('roleLookupResult');
-    const addTutorForm = document.getElementById('addTutorForm');
-    const tutorFeedback = document.getElementById('tutorFeedback');
+    const createAccountForm = document.getElementById('createAccountForm');
+    const createAccountResult = document.getElementById('createAccountResult');
+    const newAccountRole = document.getElementById('newAccountRole');
     const tutorDirectory = document.getElementById('tutorDirectory');
+
+    function updateRoleFields() {
+      const role = newAccountRole.value;
+      document.querySelectorAll('.tutor-only').forEach((el) => { el.style.display = role === 'tutor' ? '' : 'none'; });
+      document.querySelectorAll('.student-only').forEach((el) => { el.style.display = role === 'student' ? '' : 'none'; });
+    }
+    newAccountRole.addEventListener('change', updateRoleFields);
+    updateRoleFields();
 
     async function renderTutorDirectory() {
       const snapshot = await getDocs(collection(db, 'tutors'));
@@ -136,25 +155,32 @@
       });
     });
 
-    addTutorForm.addEventListener('submit', async (event) => {
+    createAccountForm.addEventListener('submit', async (event) => {
       event.preventDefault();
-      const name = document.getElementById('tutorName').value.trim();
-      const email = document.getElementById('tutorEmail').value.trim();
-      const subject = document.getElementById('tutorSubject').value.trim();
-      const bio = document.getElementById('tutorBio').value.trim();
+      createAccountResult.innerHTML = 'Creating account…';
 
-      await addDoc(collection(db, 'tutors'), {
-        name,
-        email,
-        subject,
-        bio,
-        status: 'active',
-        createdBy: auth.currentUser ? auth.currentUser.uid : null
-      });
+      const role = newAccountRole.value;
+      const name = document.getElementById('newAccountName').value.trim();
+      const email = document.getElementById('newAccountEmail').value.trim();
+      const password = document.getElementById('newAccountPassword').value;
+      const subject = document.getElementById('newAccountSubject').value.trim();
+      const bio = document.getElementById('newAccountBio').value.trim();
+      const grade = document.getElementById('newAccountGrade').value.trim();
 
-      tutorFeedback.textContent = `${name} added to the tutor directory.`;
-      addTutorForm.reset();
-      await renderTutorDirectory();
+      try {
+        const response = await createAccountCallable({ email, password, name, role, subject, bio, grade });
+        const data = response.data;
+        createAccountResult.innerHTML = data.tempPassword
+          ? `<p>Created ${data.email} as ${data.role}.</p><p>Temporary password: <strong>${data.tempPassword}</strong> — share this with them securely, it won't be shown again.</p>`
+          : `<p>Created ${data.email} as ${data.role}.</p>`;
+        createAccountForm.reset();
+        updateRoleFields();
+        if (role === 'tutor') {
+          await renderTutorDirectory();
+        }
+      } catch (error) {
+        createAccountResult.innerHTML = `<p>${error.message || 'Could not create the account.'}</p>`;
+      }
     });
 
     tutorDirectory.addEventListener('click', async (event) => {
