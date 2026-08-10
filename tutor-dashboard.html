@@ -41,6 +41,29 @@
         </div>
       </div>
 
+      <div class="dashboard-card">
+        <h3>Log a session</h3>
+        <p class="card-hint">This is what students and their linked parents see as schedule and progress/feedback. Leave notes blank for an upcoming session, or fill them in once it's done.</p>
+        <form id="logSessionForm" class="admin-form">
+          <input id="sessionStudentEmail" type="email" placeholder="Student email" required />
+          <input id="sessionSubject" type="text" placeholder="Subject" required />
+          <input id="sessionDateTime" type="datetime-local" required />
+          <select id="sessionStatus" required>
+            <option value="scheduled">Scheduled</option>
+            <option value="completed">Completed</option>
+            <option value="cancelled">Cancelled</option>
+          </select>
+          <textarea id="sessionNotes" placeholder="Notes / feedback (optional)" rows="2"></textarea>
+          <button type="submit">Save session</button>
+        </form>
+        <p class="auth-feedback" id="sessionFeedback"></p>
+      </div>
+
+      <div class="dashboard-card">
+        <h3>My logged sessions</h3>
+        <ul id="mySessionsList"><li>Loading…</li></ul>
+      </div>
+
       <button id="signOutBtn" type="button">Sign Out</button>
     </section>
   </main>
@@ -52,6 +75,7 @@
   <script type="module">
     import { initializeApp } from 'https://www.gstatic.com/firebasejs/12.4.0/firebase-app.js';
     import { getAuth, onAuthStateChanged, signOut } from 'https://www.gstatic.com/firebasejs/12.4.0/firebase-auth.js';
+    import { getFirestore, collection, query, where, orderBy, getDocs, addDoc, Timestamp, serverTimestamp } from 'https://www.gstatic.com/firebasejs/12.4.0/firebase-firestore.js';
     import { firebaseConfig, isFirebaseConfigured } from './firebase-config.js';
     import { fetchDashboardData, saveDashboardData } from './dashboard-data.js';
 
@@ -62,12 +86,69 @@
 
     const app = initializeApp(firebaseConfig);
     const auth = getAuth(app);
+    const db = getFirestore(app);
     const welcomeMessage = document.getElementById('welcomeMessage');
     const summaryText = document.getElementById('summaryText');
     const sessionList = document.getElementById('sessionList');
     const requestList = document.getElementById('requestList');
     const availabilityList = document.getElementById('availabilityList');
+    const logSessionForm = document.getElementById('logSessionForm');
+    const sessionFeedback = document.getElementById('sessionFeedback');
+    const mySessionsList = document.getElementById('mySessionsList');
     const signOutBtn = document.getElementById('signOutBtn');
+
+    async function renderMySessions() {
+      if (!auth.currentUser) return;
+      const sessionsQuery = query(
+        collection(db, 'sessions'),
+        where('tutorId', '==', auth.currentUser.uid),
+        orderBy('scheduledAt', 'desc')
+      );
+      const snapshot = await getDocs(sessionsQuery);
+      if (snapshot.empty) {
+        mySessionsList.innerHTML = '<li>No sessions logged yet.</li>';
+        return;
+      }
+      mySessionsList.innerHTML = snapshot.docs.map((docSnap) => {
+        const s = docSnap.data();
+        const when = s.scheduledAt ? s.scheduledAt.toDate().toLocaleString() : '';
+        return `<li><span>${s.studentEmail || 'Student'} — ${s.subject} — ${when} <span class="status-badge">${s.status}</span>${s.notes ? `<br>${s.notes}` : ''}</span></li>`;
+      }).join('');
+    }
+
+    logSessionForm.addEventListener('submit', async (event) => {
+      event.preventDefault();
+      sessionFeedback.textContent = 'Saving…';
+
+      const studentEmail = document.getElementById('sessionStudentEmail').value.trim();
+      const subject = document.getElementById('sessionSubject').value.trim();
+      const dateTimeValue = document.getElementById('sessionDateTime').value;
+      const status = document.getElementById('sessionStatus').value;
+      const notes = document.getElementById('sessionNotes').value.trim();
+
+      const studentQuery = query(collection(db, 'users'), where('email', '==', studentEmail), where('role', '==', 'student'));
+      const studentSnap = await getDocs(studentQuery);
+
+      if (studentSnap.empty) {
+        sessionFeedback.textContent = 'No student account found with that email.';
+        return;
+      }
+
+      await addDoc(collection(db, 'sessions'), {
+        studentId: studentSnap.docs[0].id,
+        studentEmail,
+        tutorId: auth.currentUser.uid,
+        subject,
+        scheduledAt: Timestamp.fromDate(new Date(dateTimeValue)),
+        status,
+        notes,
+        createdAt: serverTimestamp()
+      });
+
+      sessionFeedback.textContent = 'Session saved.';
+      logSessionForm.reset();
+      await renderMySessions();
+    });
 
     async function renderDashboard() {
       const data = await fetchDashboardData('tutor');
@@ -100,6 +181,7 @@
 
       welcomeMessage.textContent = `Welcome back, ${user.email || 'tutor'}!`;
       renderDashboard();
+      renderMySessions();
     });
 
     requestList.addEventListener('click', async (event) => {

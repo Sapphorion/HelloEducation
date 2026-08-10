@@ -43,6 +43,7 @@
             <select id="newAccountRole" required>
               <option value="student">Student</option>
               <option value="tutor">Tutor</option>
+              <option value="parent">Parent</option>
               <option value="admin">Admin</option>
             </select>
             <input id="newAccountName" type="text" placeholder="Name" required />
@@ -51,6 +52,7 @@
             <input id="newAccountSubject" type="text" placeholder="Subject" class="tutor-only" />
             <textarea id="newAccountBio" placeholder="Short bio" rows="2" class="tutor-only"></textarea>
             <input id="newAccountGrade" type="text" placeholder="Grade" class="student-only" />
+            <input id="newAccountChildren" type="text" placeholder="Linked student email(s), comma-separated" class="parent-only" />
             <button type="submit">Create account</button>
           </form>
           <div class="admin-result" id="createAccountResult"></div>
@@ -101,6 +103,7 @@
       const role = newAccountRole.value;
       document.querySelectorAll('.tutor-only').forEach((el) => { el.style.display = role === 'tutor' ? '' : 'none'; });
       document.querySelectorAll('.student-only').forEach((el) => { el.style.display = role === 'student' ? '' : 'none'; });
+      document.querySelectorAll('.parent-only').forEach((el) => { el.style.display = role === 'parent' ? '' : 'none'; });
     }
     newAccountRole.addEventListener('change', updateRoleFields);
     updateRoleFields();
@@ -136,23 +139,58 @@
       }
 
       const userDocSnap = snapshot.docs[0];
-      const currentRole = userDocSnap.data().role;
+      const currentData = userDocSnap.data();
 
       roleLookupResult.innerHTML = `
-        <p>Current role: <strong>${currentRole}</strong></p>
+        <p>Current role: <strong>${currentData.role}</strong></p>
         <div class="dashboard-actions">
           <button class="action-btn" data-role="student" type="button">Set student</button>
           <button class="action-btn" data-role="tutor" type="button">Set tutor</button>
+          <button class="action-btn" data-role="parent" type="button">Set parent</button>
           <button class="action-btn" data-role="admin" type="button">Set admin</button>
         </div>
+        ${currentData.role === 'parent' ? `
+          <form id="editChildrenForm" class="admin-form">
+            <input id="editChildrenEmails" type="text" placeholder="Linked student email(s), comma-separated" value="" />
+            <button type="submit">Update linked children</button>
+          </form>
+        ` : ''}
       `;
 
       roleLookupResult.querySelectorAll('button[data-role]').forEach((button) => {
         button.addEventListener('click', async () => {
-          await updateDoc(doc(db, 'users', userDocSnap.id), { role: button.dataset.role });
+          const updates = { role: button.dataset.role };
+          if (button.dataset.role !== 'parent') {
+            updates.childUids = [];
+          }
+          await updateDoc(doc(db, 'users', userDocSnap.id), updates);
           roleLookupResult.innerHTML = `<p>Updated. Current role: <strong>${button.dataset.role}</strong></p>`;
         });
       });
+
+      const editChildrenForm = document.getElementById('editChildrenForm');
+      if (editChildrenForm) {
+        editChildrenForm.addEventListener('submit', async (event) => {
+          event.preventDefault();
+          const emails = document.getElementById('editChildrenEmails').value
+            .split(',').map((e) => e.trim()).filter(Boolean);
+
+          const childUids = [];
+          const notFound = [];
+          for (const childEmail of emails) {
+            const childQuery = query(collection(db, 'users'), where('email', '==', childEmail), where('role', '==', 'student'));
+            const childSnap = await getDocs(childQuery);
+            if (childSnap.empty) {
+              notFound.push(childEmail);
+            } else {
+              childUids.push(childSnap.docs[0].id);
+            }
+          }
+
+          await updateDoc(doc(db, 'users', userDocSnap.id), { childUids });
+          roleLookupResult.innerHTML = `<p>Linked ${childUids.length} student(s).${notFound.length ? ` Not found: ${notFound.join(', ')}` : ''}</p>`;
+        });
+      }
     });
 
     createAccountForm.addEventListener('submit', async (event) => {
@@ -166,13 +204,19 @@
       const subject = document.getElementById('newAccountSubject').value.trim();
       const bio = document.getElementById('newAccountBio').value.trim();
       const grade = document.getElementById('newAccountGrade').value.trim();
+      const childEmails = document.getElementById('newAccountChildren').value
+        .split(',').map((e) => e.trim()).filter(Boolean);
 
       try {
-        const response = await createAccountCallable({ email, password, name, role, subject, bio, grade });
+        const response = await createAccountCallable({ email, password, name, role, subject, bio, grade, childEmails });
         const data = response.data;
-        createAccountResult.innerHTML = data.tempPassword
+        let message = data.tempPassword
           ? `<p>Created ${data.email} as ${data.role}.</p><p>Temporary password: <strong>${data.tempPassword}</strong> — share this with them securely, it won't be shown again.</p>`
           : `<p>Created ${data.email} as ${data.role}.</p>`;
+        if (data.role === 'parent') {
+          message += `<p>Linked ${data.childrenLinked || 0} student(s).${data.childEmailsNotFound ? ` Not found: ${data.childEmailsNotFound.join(', ')}` : ''}</p>`;
+        }
+        createAccountResult.innerHTML = message;
         createAccountForm.reset();
         updateRoleFields();
         if (role === 'tutor') {

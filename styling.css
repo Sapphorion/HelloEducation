@@ -80,6 +80,10 @@ navigation a:hover {
   background: #16a34a;
 }
 
+.auth-btn-parent {
+  background: #7c3aed;
+}
+
 .auth-page {
   display: flex;
   justify-content: center;

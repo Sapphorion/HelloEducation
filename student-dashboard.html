@@ -45,6 +45,11 @@
         </div>
       </div>
 
+      <div class="dashboard-card">
+        <h3>Progress &amp; feedback</h3>
+        <ul id="progressList"><li>Loading…</li></ul>
+      </div>
+
       <button id="signOutBtn" type="button">Sign Out</button>
     </section>
   </main>
@@ -56,6 +61,7 @@
   <script type="module">
     import { initializeApp } from 'https://www.gstatic.com/firebasejs/12.4.0/firebase-app.js';
     import { getAuth, onAuthStateChanged, signOut } from 'https://www.gstatic.com/firebasejs/12.4.0/firebase-auth.js';
+    import { getFirestore, collection, query, where, orderBy, getDocs } from 'https://www.gstatic.com/firebasejs/12.4.0/firebase-firestore.js';
     import { firebaseConfig, isFirebaseConfigured } from './firebase-config.js';
     import { fetchDashboardData, saveDashboardData } from './dashboard-data.js';
 
@@ -66,13 +72,36 @@
 
     const app = initializeApp(firebaseConfig);
     const auth = getAuth(app);
+    const db = getFirestore(app);
     const welcomeMessage = document.getElementById('welcomeMessage');
     const summaryText = document.getElementById('summaryText');
     const taskList = document.getElementById('taskList');
     const upcomingSessions = document.getElementById('upcomingSessions');
     const resourceList = document.getElementById('resourceList');
     const tutorList = document.getElementById('tutorList');
+    const progressList = document.getElementById('progressList');
     const signOutBtn = document.getElementById('signOutBtn');
+
+    async function renderSessions() {
+      if (!auth.currentUser) return;
+      const sessionsQuery = query(
+        collection(db, 'sessions'),
+        where('studentId', '==', auth.currentUser.uid),
+        orderBy('scheduledAt', 'desc')
+      );
+      const snapshot = await getDocs(sessionsQuery);
+      const sessions = snapshot.docs.map((docSnap) => docSnap.data());
+
+      const upcoming = sessions.filter((s) => s.status === 'scheduled').reverse();
+      upcomingSessions.innerHTML = upcoming.length
+        ? upcoming.map((s) => `<li>${s.subject} — ${s.scheduledAt.toDate().toLocaleString()}</li>`).join('')
+        : '<li>No upcoming sessions scheduled.</li>';
+
+      const past = sessions.filter((s) => s.status === 'completed');
+      progressList.innerHTML = past.length
+        ? past.map((s) => `<li><span>${s.subject} — ${s.scheduledAt.toDate().toLocaleDateString()}${s.notes ? `<br>${s.notes}` : ''}</span></li>`).join('')
+        : '<li>No session feedback yet.</li>';
+    }
 
     async function renderDashboard() {
       const data = await fetchDashboardData('student');
@@ -83,7 +112,6 @@
           <button class="action-btn" data-task="${task.title}" type="button">${task.done ? 'Undo' : 'Done'}</button>
         </li>
       `).join('');
-      upcomingSessions.innerHTML = data.upcomingSessions.map((session) => `<li>${session.title} — ${session.time}</li>`).join('');
       resourceList.innerHTML = data.resources.map((resource) => `<li>${resource.title} (${resource.type})</li>`).join('');
       tutorList.innerHTML = data.tutors.map((tutor) => `<li>${tutor.name} — ${tutor.subject}</li>`).join('');
     }
@@ -102,6 +130,7 @@
 
       welcomeMessage.textContent = `Welcome back, ${user.email || 'student'}!`;
       renderDashboard();
+      renderSessions();
     });
 
     taskList.addEventListener('click', async (event) => {

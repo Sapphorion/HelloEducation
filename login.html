@@ -28,6 +28,7 @@
       <div class="auth-tabs" role="tablist" aria-label="Login type">
         <button class="auth-tab active" type="button" data-role="student">Student</button>
         <button class="auth-tab" type="button" data-role="tutor">Tutor</button>
+        <button class="auth-tab" type="button" data-role="parent">Parent</button>
         <button class="auth-tab" type="button" data-role="admin">Admin</button>
       </div>
 
@@ -56,9 +57,17 @@
     import { firebaseConfig, isFirebaseConfigured } from './firebase-config.js';
     import { createUserRoleDocument } from './firestore-setup.js';
 
+    const VALID_ROLES = ['student', 'tutor', 'parent', 'admin'];
+    const DASHBOARD_URLS = {
+      student: 'student-dashboard.html',
+      tutor: 'tutor-dashboard.html',
+      parent: 'parent-dashboard.html',
+      admin: 'admin-dashboard.html'
+    };
+
     const params = new URLSearchParams(window.location.search);
     const roleFromUrl = params.get('role');
-    let activeRole = roleFromUrl === 'tutor' ? 'tutor' : roleFromUrl === 'admin' ? 'admin' : 'student';
+    let activeRole = VALID_ROLES.includes(roleFromUrl) ? roleFromUrl : 'student';
 
     const tabs = document.querySelectorAll('.auth-tab');
     const form = document.getElementById('authForm');
@@ -83,6 +92,9 @@
       if (role === 'tutor') {
         title.textContent = 'Tutor Login';
         description.textContent = 'Sign in to manage tutoring sessions and availability.';
+      } else if (role === 'parent') {
+        title.textContent = 'Parent Login';
+        description.textContent = "Sign in to see your child's schedule, progress, and tutor feedback.";
       } else if (role === 'admin') {
         title.textContent = 'Admin Login';
         description.textContent = 'Sign in to manage tutor profiles and protected portal data.';
@@ -113,11 +125,7 @@
         localStorage.setItem('helloEducationRole', activeRole);
         localStorage.setItem('helloEducationUser', email);
         feedback.textContent = 'Demo mode active. Your sign-in preview is ready.';
-        window.location.href = activeRole === 'tutor'
-          ? 'tutor-dashboard.html'
-          : activeRole === 'admin'
-            ? 'admin-dashboard.html'
-            : 'student-dashboard.html';
+        window.location.href = DASHBOARD_URLS[activeRole];
         return;
       }
 
@@ -142,11 +150,7 @@
         localStorage.setItem('helloEducationRole', activeRole);
         localStorage.setItem('helloEducationUser', userCredential.user.email || '');
         feedback.textContent = 'Signing you in...';
-        window.location.href = activeRole === 'tutor'
-          ? 'tutor-dashboard.html'
-          : activeRole === 'admin'
-            ? 'admin-dashboard.html'
-            : 'student-dashboard.html';
+        window.location.href = DASHBOARD_URLS[activeRole];
       } catch (error) {
         feedback.textContent = error.message || 'Unable to sign in.';
       }

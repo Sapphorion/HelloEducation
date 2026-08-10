@@ -21,17 +21,29 @@ service cloud.firestore {
       return signedIn() && userRole(userId) == 'student';
     }
 
+    // True if the signed-in user is a parent account linked to studentId via
+    // its own childUids array. Only admins can set childUids (see the users
+    // update rule below), so this link can't be self-granted.
+    function isParentOf(studentId) {
+      return signedIn()
+        && studentId in get(/databases/$(database)/documents/users/$(request.auth.uid)).data.get('childUids', []);
+    }
+
     match /users/{userId} {
       allow read: if signedIn() && (request.auth.uid == userId || isAdmin(request.auth.uid));
-      // Self-serve signup may only claim the student role. Tutor and admin
-      // roles must be granted by an existing admin (via the admin dashboard
-      // or directly in the Firestore console) — never self-assigned.
+      // Self-serve signup may only claim the student role. Tutor, parent and
+      // admin roles must be granted by an existing admin (via the admin
+      // dashboard or directly in the Firestore console) — never self-assigned.
       allow create: if signedIn()
         && request.auth.uid == userId
         && request.resource.data.role == 'student';
+      // Self-updates may never change role or childUids (parent-child links)
+      // — only an admin can grant a role or link a parent to a student.
       allow update: if signedIn() && (
         isAdmin(request.auth.uid)
-        || (request.auth.uid == userId && request.resource.data.role == resource.data.role)
+        || (request.auth.uid == userId
+            && request.resource.data.role == resource.data.role
+            && request.resource.data.get('childUids', []) == resource.data.get('childUids', []))
       );
       allow delete: if isAdmin(request.auth.uid);
     }
@@ -42,9 +54,26 @@ service cloud.firestore {
     }
 
     match /students/{studentId} {
-      allow read: if signedIn() && (request.auth.uid == studentId || isAdmin(request.auth.uid));
+      allow read: if signedIn() && (request.auth.uid == studentId || isAdmin(request.auth.uid) || isParentOf(studentId));
       allow create, update: if signedIn() && (request.auth.uid == studentId || isAdmin(request.auth.uid));
       allow delete: if isAdmin(request.auth.uid);
+    }
+
+    match /sessions/{sessionId} {
+      allow read: if signedIn() && (
+        isAdmin(request.auth.uid)
+        || resource.data.tutorId == request.auth.uid
+        || resource.data.studentId == request.auth.uid
+        || isParentOf(resource.data.studentId)
+      );
+      allow create: if signedIn() && (
+        isAdmin(request.auth.uid)
+        || (isTutor(request.auth.uid) && request.resource.data.tutorId == request.auth.uid)
+      );
+      allow update: if signedIn() && (
+        isAdmin(request.auth.uid) || resource.data.tutorId == request.auth.uid
+      );
+      allow delete: if isAdmin(request.auth.uid) || resource.data.tutorId == request.auth.uid;
     }
 
     match /dashboardData/{docId} {
