@@ -130,3 +130,71 @@ exports.createAccount = onCall(async (request) => {
     childEmailsNotFound: role === 'parent' && childEmailsNotFound.length ? childEmailsNotFound : undefined
   };
 });
+
+// Enables/disables sign-in for an account without deleting its data. Only
+// callable by an admin — the client SDK has no way to touch another user's
+// Auth record at all.
+exports.setAccountDisabled = onCall(async (request) => {
+  const callerUid = await requireAdmin(request.auth);
+  const { uid, disabled } = request.data || {};
+
+  if (!uid || typeof uid !== 'string') {
+    throw new HttpsError('invalid-argument', 'A uid is required.');
+  }
+  if (uid === callerUid) {
+    throw new HttpsError('failed-precondition', "You can't disable your own account.");
+  }
+
+  await auth.updateUser(uid, { disabled: Boolean(disabled) });
+  await db.doc(`users/${uid}`).update({ disabled: Boolean(disabled) });
+
+  return { uid, disabled: Boolean(disabled) };
+});
+
+// Permanently deletes an account: the Auth record, its users/ doc, its
+// tutors/ or students/ profile if any, and removes it from any parent's
+// linked children. Only callable by an admin, for the same reason as above.
+exports.deleteAccount = onCall(async (request) => {
+  const callerUid = await requireAdmin(request.auth);
+  const { uid } = request.data || {};
+
+  if (!uid || typeof uid !== 'string') {
+    throw new HttpsError('invalid-argument', 'A uid is required.');
+  }
+  if (uid === callerUid) {
+    throw new HttpsError('failed-precondition', "You can't delete your own account.");
+  }
+
+  const userDoc = await db.doc(`users/${uid}`).get();
+  const role = userDoc.exists ? userDoc.data().role : null;
+
+  try {
+    await auth.deleteUser(uid);
+  } catch (error) {
+    if (error.code !== 'auth/user-not-found') {
+      throw new HttpsError('internal', error.message || 'Could not delete the account.');
+    }
+  }
+
+  const batch = db.batch();
+  batch.delete(db.doc(`users/${uid}`));
+  if (role === 'tutor') {
+    batch.delete(db.doc(`tutors/${uid}`));
+  }
+  if (role === 'student') {
+    batch.delete(db.doc(`students/${uid}`));
+  }
+  await batch.commit();
+
+  if (role === 'student') {
+    const parentsWithChild = await db.collection('users')
+      .where('role', '==', 'parent')
+      .where('childUids', 'array-contains', uid)
+      .get();
+    await Promise.all(parentsWithChild.docs.map((parentDoc) =>
+      parentDoc.ref.update({ childUids: FieldValue.arrayRemove(uid) })
+    ));
+  }
+
+  return { uid, deleted: true };
+});

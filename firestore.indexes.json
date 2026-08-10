@@ -15,6 +15,14 @@
         { "fieldPath": "studentId", "order": "ASCENDING" },
         { "fieldPath": "scheduledAt", "order": "DESCENDING" }
       ]
+    },
+    {
+      "collectionGroup": "users",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "role", "order": "ASCENDING" },
+        { "fieldPath": "childUids", "arrayConfig": "CONTAINS" }
+      ]
     }
   ],
   "fieldOverrides": []

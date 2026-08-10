@@ -64,6 +64,12 @@
         <ul id="tutorDirectory"><li>Loading…</li></ul>
       </div>
 
+      <div class="dashboard-card">
+        <h3>All accounts</h3>
+        <p class="card-hint">Every account on the platform. Change a role, disable sign-in without losing their data, or permanently delete an account.</p>
+        <ul id="accountsDirectory" class="accounts-directory"><li>Loading…</li></ul>
+      </div>
+
       <button id="signOutBtn" type="button">Sign Out</button>
     </section>
   </main>
@@ -89,6 +95,8 @@
     const db = getFirestore(app);
     const functions = getFunctions(app);
     const createAccountCallable = httpsCallable(functions, 'createAccount');
+    const setAccountDisabledCallable = httpsCallable(functions, 'setAccountDisabled');
+    const deleteAccountCallable = httpsCallable(functions, 'deleteAccount');
     const welcomeMessage = document.getElementById('welcomeMessage');
     const summaryText = document.getElementById('summaryText');
     const signOutBtn = document.getElementById('signOutBtn');
@@ -98,6 +106,8 @@
     const createAccountResult = document.getElementById('createAccountResult');
     const newAccountRole = document.getElementById('newAccountRole');
     const tutorDirectory = document.getElementById('tutorDirectory');
+    const accountsDirectory = document.getElementById('accountsDirectory');
+    const ROLE_ORDER = ['admin', 'tutor', 'parent', 'student'];
 
     function updateRoleFields() {
       const role = newAccountRole.value;
@@ -124,6 +134,81 @@
         `;
       }).join('');
     }
+
+    async function renderAccountsDirectory() {
+      const snapshot = await getDocs(collection(db, 'users'));
+      if (snapshot.empty) {
+        accountsDirectory.innerHTML = '<li>No accounts yet.</li>';
+        return;
+      }
+
+      const accounts = snapshot.docs
+        .map((docSnap) => ({ id: docSnap.id, ...docSnap.data() }))
+        .sort((a, b) => ROLE_ORDER.indexOf(a.role) - ROLE_ORDER.indexOf(b.role) || (a.name || '').localeCompare(b.name || ''));
+
+      const currentUid = auth.currentUser ? auth.currentUser.uid : null;
+
+      accountsDirectory.innerHTML = accounts.map((account) => {
+        const isSelf = account.id === currentUid;
+        const disabledBadge = account.disabled ? ' <span class="status-badge" style="background:#fee2e2;color:#b91c1c;">disabled</span>' : '';
+        const roleOptions = ['student', 'tutor', 'parent', 'admin']
+          .map((r) => `<option value="${r}" ${r === account.role ? 'selected' : ''}>${r}</option>`)
+          .join('');
+
+        return `
+          <li>
+            <div>
+              <strong>${account.name || '(no name)'}</strong> — ${account.email}
+              <span class="status-badge">${account.role}</span>${disabledBadge}${isSelf ? ' (you)' : ''}
+            </div>
+            ${isSelf ? '' : `
+              <div class="dashboard-actions">
+                <select data-uid="${account.id}" class="directory-role-select">${roleOptions}</select>
+                <button class="action-btn" data-action="save-role" data-uid="${account.id}" type="button">Save role</button>
+                <button class="action-btn secondary" data-action="toggle-disabled" data-uid="${account.id}" data-disabled="${Boolean(account.disabled)}" type="button">${account.disabled ? 'Enable' : 'Disable'}</button>
+                <button class="action-btn secondary" data-action="delete" data-uid="${account.id}" type="button">Delete</button>
+              </div>
+            `}
+          </li>
+        `;
+      }).join('');
+    }
+
+    accountsDirectory.addEventListener('click', async (event) => {
+      const button = event.target.closest('button[data-action]');
+      if (!button) return;
+      const uid = button.dataset.uid;
+      const action = button.dataset.action;
+
+      if (action === 'save-role') {
+        const select = accountsDirectory.querySelector(`select[data-uid="${uid}"]`);
+        const newRole = select.value;
+        const updates = { role: newRole };
+        if (newRole !== 'parent') {
+          updates.childUids = [];
+        }
+        await updateDoc(doc(db, 'users', uid), updates);
+        await renderAccountsDirectory();
+        await renderTutorDirectory();
+        return;
+      }
+
+      if (action === 'toggle-disabled') {
+        const nextDisabled = button.dataset.disabled !== 'true';
+        await setAccountDisabledCallable({ uid, disabled: nextDisabled });
+        await renderAccountsDirectory();
+        return;
+      }
+
+      if (action === 'delete') {
+        const li = button.closest('li');
+        const label = li.querySelector('strong')?.textContent || 'this account';
+        if (!confirm(`Permanently delete ${label}? This can't be undone.`)) return;
+        await deleteAccountCallable({ uid });
+        await renderAccountsDirectory();
+        await renderTutorDirectory();
+      }
+    });
 
     roleLookupForm.addEventListener('submit', async (event) => {
       event.preventDefault();
@@ -222,6 +307,7 @@
         if (role === 'tutor') {
           await renderTutorDirectory();
         }
+        await renderAccountsDirectory();
       } catch (error) {
         createAccountResult.innerHTML = `<p>${error.message || 'Could not create the account.'}</p>`;
       }
@@ -249,6 +335,7 @@
       welcomeMessage.textContent = `Welcome back, ${user.email || 'admin'}!`;
       summaryText.textContent = 'Your admin account is ready.';
       renderTutorDirectory();
+      renderAccountsDirectory();
     });
 
     signOutBtn.addEventListener('click', async () => {

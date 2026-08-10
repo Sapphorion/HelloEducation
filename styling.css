@@ -266,6 +266,17 @@ navigation a:hover {
   color: #334155;
 }
 
+.accounts-directory li {
+  flex-wrap: wrap;
+}
+
+.accounts-directory select {
+  padding: 0.35rem 0.5rem;
+  border-radius: 8px;
+  border: 1px solid #cbd5e1;
+  font-size: 0.85rem;
+}
+
 @media (max-width: 768px) {
   navigation ul {
     gap: 0.4rem;
