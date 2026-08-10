@@ -126,7 +126,7 @@
 
       const upcoming = sessions.filter((s) => s.status === 'scheduled').reverse();
       upcomingSessions.innerHTML = upcoming.length
-        ? upcoming.map((s) => `<li>${s.subject} — ${s.scheduledAt.toDate().toLocaleString()}</li>`).join('')
+        ? upcoming.map((s) => `<li>${s.subject} — ${s.scheduledAt.toDate().toLocaleString()}${s.meetingLink ? ` — <a href="${s.meetingLink}" target="_blank" rel="noopener">Join session</a>` : ''}</li>`).join('')
         : '<li>No upcoming sessions scheduled.</li>';
 
       const past = sessions.filter((s) => s.status === 'completed');

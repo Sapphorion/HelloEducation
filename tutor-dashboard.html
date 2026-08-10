@@ -59,6 +59,7 @@
           <input id="sessionStudentEmail" type="email" placeholder="Student email" required />
           <input id="sessionSubject" type="text" placeholder="Subject" required />
           <input id="sessionDateTime" type="datetime-local" required />
+          <input id="sessionMeetingLink" type="url" placeholder="Meeting link (optional, e.g. Google Meet)" />
           <select id="sessionStatus" required>
             <option value="scheduled">Scheduled</option>
             <option value="completed">Completed</option>
@@ -122,7 +123,12 @@
 
       const logged = allMySessions.filter((s) => s.status !== 'pending');
       mySessionsList.innerHTML = logged.length
-        ? logged.map((s) => `<li><span>${s.studentEmail || 'Student'} — ${s.subject} — ${s.scheduledAt.toDate().toLocaleString()} <span class="status-badge">${s.status}</span>${s.notes ? `<br>${s.notes}` : ''}</span></li>`).join('')
+        ? logged.map((s) => `
+          <li>
+            <span>${s.studentEmail || 'Student'} — ${s.subject} — ${s.scheduledAt.toDate().toLocaleString()} <span class="status-badge">${s.status}</span>${s.meetingLink ? ` — <a href="${s.meetingLink}" target="_blank" rel="noopener">Meeting link</a>` : ''}${s.notes ? `<br>${s.notes}` : ''}</span>
+            <button class="action-btn secondary" data-set-link="${s.id}" type="button">${s.meetingLink ? 'Edit link' : 'Add link'}</button>
+          </li>
+        `).join('')
         : '<li>No sessions logged yet.</li>';
 
       renderRequests();
@@ -146,8 +152,22 @@
     requestList.addEventListener('click', async (event) => {
       const button = event.target.closest('button[data-session-id]');
       if (!button) return;
-      const newStatus = button.dataset.action === 'accept' ? 'scheduled' : 'cancelled';
-      await updateDoc(doc(db, 'sessions', button.dataset.sessionId), { status: newStatus });
+      const updates = { status: button.dataset.action === 'accept' ? 'scheduled' : 'cancelled' };
+      if (button.dataset.action === 'accept') {
+        const link = prompt('Optional: paste a meeting link (e.g. Google Meet) for this session, or leave blank.');
+        if (link) updates.meetingLink = link.trim();
+      }
+      await updateDoc(doc(db, 'sessions', button.dataset.sessionId), updates);
+      await renderMySessions();
+    });
+
+    mySessionsList.addEventListener('click', async (event) => {
+      const button = event.target.closest('button[data-set-link]');
+      if (!button) return;
+      const session = allMySessions.find((s) => s.id === button.dataset.setLink);
+      const link = prompt('Meeting link for this session:', session?.meetingLink || '');
+      if (link === null) return;
+      await updateDoc(doc(db, 'sessions', button.dataset.setLink), { meetingLink: link.trim() });
       await renderMySessions();
     });
 
@@ -196,6 +216,7 @@
       const studentEmail = document.getElementById('sessionStudentEmail').value.trim();
       const subject = document.getElementById('sessionSubject').value.trim();
       const dateTimeValue = document.getElementById('sessionDateTime').value;
+      const meetingLink = document.getElementById('sessionMeetingLink').value.trim();
       const status = document.getElementById('sessionStatus').value;
       const notes = document.getElementById('sessionNotes').value.trim();
 
@@ -215,6 +236,7 @@
         scheduledAt: Timestamp.fromDate(new Date(dateTimeValue)),
         status,
         notes,
+        meetingLink: meetingLink || null,
         createdAt: serverTimestamp()
       });
 
