@@ -54,12 +54,11 @@
 
       <div class="dashboard-card">
         <h3>Log a session</h3>
-        <p class="card-hint">This is what students and their linked parents see as schedule and progress/feedback. Leave notes blank for an upcoming session, or fill them in once it's done.</p>
+        <p class="card-hint">This is what students and their linked parents see as schedule and progress/feedback. Leave notes blank for an upcoming session, or fill them in once it's done. Scheduled sessions get a video call link automatically — no need to create one yourself.</p>
         <form id="logSessionForm" class="admin-form">
           <input id="sessionStudentEmail" type="email" placeholder="Student email" required />
           <input id="sessionSubject" type="text" placeholder="Subject" required />
           <input id="sessionDateTime" type="datetime-local" required />
-          <input id="sessionMeetingLink" type="url" placeholder="Meeting link (optional, e.g. Google Meet)" />
           <select id="sessionStatus" required>
             <option value="scheduled">Scheduled</option>
             <option value="completed">Completed</option>
@@ -126,6 +125,14 @@
     import { firebaseConfig, isFirebaseConfigured } from './firebase-config.js';
 
     const DAY_NAMES = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+
+    // Auto-generates a free Jitsi Meet video call room — no account, API key,
+    // or setup needed. The random slug is what keeps the room private in
+    // practice, since Jitsi rooms have no access control beyond the URL.
+    function generateMeetingLink() {
+      const slug = crypto.randomUUID().replace(/-/g, '').slice(0, 16);
+      return `https://meet.jit.si/HelloEducation-${slug}`;
+    }
 
     const role = localStorage.getItem('helloEducationRole');
     if (role !== 'tutor') {
@@ -343,8 +350,7 @@
       if (!button) return;
       const updates = { status: button.dataset.action === 'accept' ? 'scheduled' : 'cancelled' };
       if (button.dataset.action === 'accept') {
-        const link = prompt('Optional: paste a meeting link (e.g. Google Meet) for this session, or leave blank.');
-        if (link) updates.meetingLink = link.trim();
+        updates.meetingLink = generateMeetingLink();
       }
       await updateDoc(doc(db, 'sessions', button.dataset.sessionId), updates);
       await renderMySessions();
@@ -405,7 +411,6 @@
       const studentEmail = document.getElementById('sessionStudentEmail').value.trim();
       const subject = document.getElementById('sessionSubject').value.trim();
       const dateTimeValue = document.getElementById('sessionDateTime').value;
-      const meetingLink = document.getElementById('sessionMeetingLink').value.trim();
       const status = document.getElementById('sessionStatus').value;
       const notes = document.getElementById('sessionNotes').value.trim();
 
@@ -425,7 +430,7 @@
         scheduledAt: Timestamp.fromDate(new Date(dateTimeValue)),
         status,
         notes,
-        meetingLink: meetingLink || null,
+        meetingLink: status === 'scheduled' ? generateMeetingLink() : null,
         createdAt: serverTimestamp()
       });
 
