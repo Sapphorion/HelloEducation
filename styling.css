@@ -333,6 +333,31 @@ navigation a:hover {
   flex-wrap: wrap;
 }
 
+.accounts-filter {
+  display: flex;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+  align-items: center;
+  margin: 0.7rem 0;
+}
+
+.accounts-filter input[type="text"],
+.accounts-filter select {
+  padding: 0.5rem 0.7rem;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  font-size: 0.9rem;
+  font-family: inherit;
+}
+
+.accounts-filter-checkbox {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.9rem;
+  color: #334155;
+}
+
 .accounts-directory select {
   padding: 0.35rem 0.5rem;
   border-radius: 8px;

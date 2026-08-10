@@ -84,6 +84,20 @@
       <div class="dashboard-card">
         <h3>All accounts</h3>
         <p class="card-hint">Every account on the platform. Change a role, disable sign-in without losing their data, or permanently delete an account.</p>
+        <div class="accounts-filter">
+          <input id="accountsSearch" type="text" placeholder="Search name or email…" />
+          <select id="accountsRoleFilter">
+            <option value="">All roles</option>
+            <option value="student">Student</option>
+            <option value="tutor">Tutor</option>
+            <option value="parent">Parent</option>
+            <option value="admin">Admin</option>
+          </select>
+          <label class="accounts-filter-checkbox">
+            <input id="accountsDisabledFilter" type="checkbox" />
+            Disabled only
+          </label>
+        </div>
         <ul id="accountsDirectory" class="accounts-directory"><li>Loading…</li></ul>
       </div>
 
@@ -124,6 +138,9 @@
     const newAccountRole = document.getElementById('newAccountRole');
     const tutorDirectory = document.getElementById('tutorDirectory');
     const accountsDirectory = document.getElementById('accountsDirectory');
+    const accountsSearch = document.getElementById('accountsSearch');
+    const accountsRoleFilter = document.getElementById('accountsRoleFilter');
+    const accountsDisabledFilter = document.getElementById('accountsDisabledFilter');
     const roleStatTiles = document.getElementById('roleStatTiles');
     const sessionStatTiles = document.getElementById('sessionStatTiles');
     const upcomingReportList = document.getElementById('upcomingReportList');
@@ -207,16 +224,35 @@
       }).join('');
     }
 
+    let allAccounts = [];
+
     async function renderAccountsDirectory() {
       const snapshot = await getDocs(collection(db, 'users'));
-      if (snapshot.empty) {
-        accountsDirectory.innerHTML = '<li>No accounts yet.</li>';
-        return;
-      }
-
-      const accounts = snapshot.docs
+      allAccounts = snapshot.docs
         .map((docSnap) => ({ id: docSnap.id, ...docSnap.data() }))
         .sort((a, b) => ROLE_ORDER.indexOf(a.role) - ROLE_ORDER.indexOf(b.role) || (a.name || '').localeCompare(b.name || ''));
+      renderFilteredAccounts();
+    }
+
+    function renderFilteredAccounts() {
+      const search = accountsSearch.value.trim().toLowerCase();
+      const roleFilter = accountsRoleFilter.value;
+      const disabledOnly = accountsDisabledFilter.checked;
+
+      const accounts = allAccounts.filter((account) => {
+        if (roleFilter && account.role !== roleFilter) return false;
+        if (disabledOnly && !account.disabled) return false;
+        if (search) {
+          const haystack = `${account.name || ''} ${account.email || ''}`.toLowerCase();
+          if (!haystack.includes(search)) return false;
+        }
+        return true;
+      });
+
+      if (!accounts.length) {
+        accountsDirectory.innerHTML = `<li>${allAccounts.length ? 'No accounts match this filter.' : 'No accounts yet.'}</li>`;
+        return;
+      }
 
       const currentUid = auth.currentUser ? auth.currentUser.uid : null;
 
@@ -245,6 +281,10 @@
         `;
       }).join('');
     }
+
+    accountsSearch.addEventListener('input', renderFilteredAccounts);
+    accountsRoleFilter.addEventListener('change', renderFilteredAccounts);
+    accountsDisabledFilter.addEventListener('change', renderFilteredAccounts);
 
     accountsDirectory.addEventListener('click', async (event) => {
       const button = event.target.closest('button[data-action]');
