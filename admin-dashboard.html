@@ -26,86 +26,121 @@
       <h2 id="welcomeMessage">Admin portal</h2>
       <p id="summaryText">Manage tutor profiles and user roles.</p>
 
-      <div class="dashboard-card">
-        <h3>Reporting &amp; oversight</h3>
-        <div class="auth-tabs report-tabs" role="tablist" aria-label="Reporting view">
-          <button class="auth-tab active" type="button" data-report-tab="overview">Overview</button>
-          <button class="auth-tab" type="button" data-report-tab="upcoming">Upcoming Sessions</button>
-          <button class="auth-tab" type="button" data-report-tab="inactive">Inactive Tutors</button>
+      <section class="admin-section">
+        <h2 class="admin-section-title">Reporting &amp; Oversight</h2>
+        <div class="dashboard-card">
+          <h3>Reporting &amp; oversight</h3>
+          <div class="auth-tabs report-tabs" role="tablist" aria-label="Reporting view">
+            <button class="auth-tab active" type="button" data-report-tab="overview">Overview</button>
+            <button class="auth-tab" type="button" data-report-tab="upcoming">Upcoming Sessions</button>
+            <button class="auth-tab" type="button" data-report-tab="inactive">Inactive Tutors</button>
+          </div>
+
+          <div class="report-panel" data-report-panel="overview">
+            <div id="roleStatTiles" class="stat-tile-row"></div>
+            <div id="sessionStatTiles" class="stat-tile-row"></div>
+          </div>
+          <div class="report-panel" data-report-panel="upcoming" hidden>
+            <ul id="upcomingReportList"><li>Loading…</li></ul>
+          </div>
+          <div class="report-panel" data-report-panel="inactive" hidden>
+            <ul id="inactiveTutorsList"><li>Loading…</li></ul>
+          </div>
+        </div>
+      </section>
+
+      <section class="admin-section">
+        <h2 class="admin-section-title">Accounts</h2>
+        <div class="dashboard-grid">
+          <div class="dashboard-card">
+            <h3>Grant a role</h3>
+            <p class="card-hint">Look up a signed-up account by email, then promote it to tutor or admin. New accounts start as students until you do this.</p>
+            <form id="roleLookupForm" class="admin-form">
+              <input id="roleLookupEmail" type="email" placeholder="Account email" required />
+              <button type="submit">Look up</button>
+            </form>
+            <div id="roleLookupResult" class="admin-result"></div>
+          </div>
+          <div class="dashboard-card">
+            <h3>Create an account</h3>
+            <p class="card-hint">Creates their login and profile in one step. Leave the password blank to auto-generate a temporary one to share with them.</p>
+            <form id="createAccountForm" class="admin-form">
+              <select id="newAccountRole" required>
+                <option value="student">Student</option>
+                <option value="tutor">Tutor</option>
+                <option value="parent">Parent</option>
+                <option value="matricStudent">Second Chance Student</option>
+                <option value="admin">Admin</option>
+              </select>
+              <input id="newAccountName" type="text" placeholder="Name" required />
+              <input id="newAccountEmail" type="email" placeholder="Email" required />
+              <input id="newAccountPassword" type="password" placeholder="Password (optional — auto-generated if blank)" />
+              <input id="newAccountSubject" type="text" placeholder="Subject" class="tutor-only" />
+              <textarea id="newAccountBio" placeholder="Short bio" rows="2" class="tutor-only"></textarea>
+              <input id="newAccountGrade" type="text" placeholder="Grade" class="student-only" />
+              <input id="newAccountChildren" type="text" placeholder="Linked student email(s), comma-separated" class="parent-only" />
+              <button type="submit">Create account</button>
+            </form>
+            <div class="admin-result" id="createAccountResult"></div>
+          </div>
         </div>
 
-        <div class="report-panel" data-report-panel="overview">
-          <div id="roleStatTiles" class="stat-tile-row"></div>
-          <div id="sessionStatTiles" class="stat-tile-row"></div>
+        <div class="dashboard-card">
+          <h3>Current tutors</h3>
+          <ul id="tutorDirectory"><li>Loading…</li></ul>
         </div>
-        <div class="report-panel" data-report-panel="upcoming" hidden>
-          <ul id="upcomingReportList"><li>Loading…</li></ul>
-        </div>
-        <div class="report-panel" data-report-panel="inactive" hidden>
-          <ul id="inactiveTutorsList"><li>Loading…</li></ul>
-        </div>
-      </div>
 
-      <div class="dashboard-grid">
         <div class="dashboard-card">
-          <h3>Grant a role</h3>
-          <p class="card-hint">Look up a signed-up account by email, then promote it to tutor or admin. New accounts start as students until you do this.</p>
-          <form id="roleLookupForm" class="admin-form">
-            <input id="roleLookupEmail" type="email" placeholder="Account email" required />
-            <button type="submit">Look up</button>
-          </form>
-          <div id="roleLookupResult" class="admin-result"></div>
-        </div>
-        <div class="dashboard-card">
-          <h3>Create an account</h3>
-          <p class="card-hint">Creates their login and profile in one step. Leave the password blank to auto-generate a temporary one to share with them.</p>
-          <form id="createAccountForm" class="admin-form">
-            <select id="newAccountRole" required>
+          <h3>All accounts</h3>
+          <p class="card-hint">Every account on the platform. Change a role, disable sign-in without losing their data, or permanently delete an account.</p>
+          <div class="accounts-filter">
+            <input id="accountsSearch" type="text" placeholder="Search name or email…" />
+            <select id="accountsRoleFilter">
+              <option value="">All roles</option>
               <option value="student">Student</option>
               <option value="tutor">Tutor</option>
               <option value="parent">Parent</option>
               <option value="matricStudent">Second Chance Student</option>
               <option value="admin">Admin</option>
             </select>
-            <input id="newAccountName" type="text" placeholder="Name" required />
-            <input id="newAccountEmail" type="email" placeholder="Email" required />
-            <input id="newAccountPassword" type="password" placeholder="Password (optional — auto-generated if blank)" />
-            <input id="newAccountSubject" type="text" placeholder="Subject" class="tutor-only" />
-            <textarea id="newAccountBio" placeholder="Short bio" rows="2" class="tutor-only"></textarea>
-            <input id="newAccountGrade" type="text" placeholder="Grade" class="student-only" />
-            <input id="newAccountChildren" type="text" placeholder="Linked student email(s), comma-separated" class="parent-only" />
-            <button type="submit">Create account</button>
-          </form>
-          <div class="admin-result" id="createAccountResult"></div>
+            <label class="accounts-filter-checkbox">
+              <input id="accountsDisabledFilter" type="checkbox" />
+              Disabled only
+            </label>
+          </div>
+          <ul id="accountsDirectory" class="accounts-directory"><li>Loading…</li></ul>
         </div>
-      </div>
+      </section>
 
-      <div class="dashboard-card">
-        <h3>Assign work to a student</h3>
-        <p class="card-hint">Same assignment system tutors use — shows up on the student's "Today's focus" list.</p>
-        <form id="adminAssignForm" class="admin-form">
-          <input id="adminAssignStudentEmail" type="email" placeholder="Student email" required />
-          <input id="adminAssignTitle" type="text" placeholder="Title" required />
-          <textarea id="adminAssignDescription" placeholder="Instructions (optional)" rows="2"></textarea>
-          <button type="submit">Assign</button>
-        </form>
-        <p class="auth-feedback" id="adminAssignFeedback"></p>
-      </div>
+      <section class="admin-section">
+        <h2 class="admin-section-title">Assignments &amp; Resources</h2>
+        <div class="dashboard-card">
+          <h3>Assign work to a student</h3>
+          <p class="card-hint">Same assignment system tutors use — shows up on the student's "Today's focus" list.</p>
+          <form id="adminAssignForm" class="admin-form">
+            <input id="adminAssignStudentEmail" type="email" placeholder="Student email" required />
+            <input id="adminAssignTitle" type="text" placeholder="Title" required />
+            <textarea id="adminAssignDescription" placeholder="Instructions (optional)" rows="2"></textarea>
+            <button type="submit">Assign</button>
+          </form>
+          <p class="auth-feedback" id="adminAssignFeedback"></p>
+        </div>
 
-      <div class="dashboard-card">
-        <h3>Share a study resource</h3>
-        <form id="adminResourceForm" class="admin-form">
-          <input id="adminResourceStudentEmail" type="email" placeholder="Student email" required />
-          <input id="adminResourceTitle" type="text" placeholder="Title" required />
-          <input id="adminResourceType" type="text" placeholder="Type (e.g. PDF, Link, Worksheet)" required />
-          <input id="adminResourceUrl" type="url" placeholder="Link (optional)" />
-          <button type="submit">Share</button>
-        </form>
-        <p class="auth-feedback" id="adminResourceFeedback"></p>
-      </div>
+        <div class="dashboard-card">
+          <h3>Share a study resource</h3>
+          <form id="adminResourceForm" class="admin-form">
+            <input id="adminResourceStudentEmail" type="email" placeholder="Student email" required />
+            <input id="adminResourceTitle" type="text" placeholder="Title" required />
+            <input id="adminResourceType" type="text" placeholder="Type (e.g. PDF, Link, Worksheet)" required />
+            <input id="adminResourceUrl" type="url" placeholder="Link (optional)" />
+            <button type="submit">Share</button>
+          </form>
+          <p class="auth-feedback" id="adminResourceFeedback"></p>
+        </div>
+      </section>
 
-      <div class="dashboard-card">
-        <h3>Second Chance Programme</h3>
+      <section class="admin-section">
+        <h2 class="admin-section-title">Second Chance Programme</h2>
         <p class="card-hint">HelloEducation's Second Chance Programme — fixed-timetable online schooling for matric re-write students, separate from general tutoring. Groups of up to 4 students share a weekly class slot (Monday–Thursday, 9am–3pm) per subject.</p>
 
         <div class="dashboard-grid dashboard-grid-2">
@@ -170,33 +205,7 @@
             <p class="auth-feedback" id="matricAssignFeedback"></p>
           </div>
         </div>
-      </div>
-
-      <div class="dashboard-card">
-        <h3>Current tutors</h3>
-        <ul id="tutorDirectory"><li>Loading…</li></ul>
-      </div>
-
-      <div class="dashboard-card">
-        <h3>All accounts</h3>
-        <p class="card-hint">Every account on the platform. Change a role, disable sign-in without losing their data, or permanently delete an account.</p>
-        <div class="accounts-filter">
-          <input id="accountsSearch" type="text" placeholder="Search name or email…" />
-          <select id="accountsRoleFilter">
-            <option value="">All roles</option>
-            <option value="student">Student</option>
-            <option value="tutor">Tutor</option>
-            <option value="parent">Parent</option>
-            <option value="matricStudent">Second Chance Student</option>
-            <option value="admin">Admin</option>
-          </select>
-          <label class="accounts-filter-checkbox">
-            <input id="accountsDisabledFilter" type="checkbox" />
-            Disabled only
-          </label>
-        </div>
-        <ul id="accountsDirectory" class="accounts-directory"><li>Loading…</li></ul>
-      </div>
+      </section>
 
       <button id="signOutBtn" type="button">Sign Out</button>
     </section>
