@@ -64,7 +64,7 @@ exports.createAccount = onCall(async (request) => {
     throw new HttpsError('invalid-argument', 'A name is required.');
   }
   if (!VALID_ROLES.includes(role)) {
-    throw new HttpsError('invalid-argument', 'Role must be student, tutor, parent, matricStudent, or admin.');
+    throw new HttpsError('invalid-argument', 'Role must be student, tutor, parent, matricStudent (Second Chance), or admin.');
   }
 
   let childUids = [];
@@ -308,7 +308,7 @@ exports.enrollMatricStudent = onCall(async (request) => {
   const { studentId, subject } = request.data || {};
 
   if (!studentId || typeof studentId !== 'string') {
-    throw new HttpsError('invalid-argument', 'A matric student is required.');
+    throw new HttpsError('invalid-argument', 'A Second Chance student is required.');
   }
   if (!subject || typeof subject !== 'string' || !subject.trim()) {
     throw new HttpsError('invalid-argument', 'A subject is required.');
@@ -316,7 +316,7 @@ exports.enrollMatricStudent = onCall(async (request) => {
 
   const studentDoc = await db.doc(`matricStudents/${studentId}`).get();
   if (!studentDoc.exists) {
-    throw new HttpsError('not-found', 'That matric student was not found.');
+    throw new HttpsError('not-found', 'That Second Chance student was not found.');
   }
 
   const groupsSnap = await db.collection('matricGroups').where('subject', '==', subject).get();

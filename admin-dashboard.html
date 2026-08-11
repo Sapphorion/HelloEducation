@@ -64,7 +64,7 @@
               <option value="student">Student</option>
               <option value="tutor">Tutor</option>
               <option value="parent">Parent</option>
-              <option value="matricStudent">Matric Student</option>
+              <option value="matricStudent">Second Chance Student</option>
               <option value="admin">Admin</option>
             </select>
             <input id="newAccountName" type="text" placeholder="Name" required />
@@ -105,8 +105,8 @@
       </div>
 
       <div class="dashboard-card">
-        <h3>Matric Re-write Programme</h3>
-        <p class="card-hint">Fixed-timetable online schooling for matric re-write students, separate from general tutoring. Groups of up to 4 students share a weekly class slot (Monday–Thursday, 9am–3pm) per subject.</p>
+        <h3>Second Chance Programme</h3>
+        <p class="card-hint">HelloEducation's Second Chance Programme — fixed-timetable online schooling for matric re-write students, separate from general tutoring. Groups of up to 4 students share a weekly class slot (Monday–Thursday, 9am–3pm) per subject.</p>
 
         <div class="dashboard-grid dashboard-grid-2">
           <div class="dashboard-card">
@@ -187,7 +187,7 @@
             <option value="student">Student</option>
             <option value="tutor">Tutor</option>
             <option value="parent">Parent</option>
-            <option value="matricStudent">Matric Student</option>
+            <option value="matricStudent">Second Chance Student</option>
             <option value="admin">Admin</option>
           </select>
           <label class="accounts-filter-checkbox">
@@ -231,6 +231,10 @@
     function generateMeetingLink() {
       const slug = crypto.randomUUID().replace(/-/g, '').slice(0, 16);
       return `https://meet.jit.si/HelloEducation-${slug}`;
+    }
+
+    function roleLabel(role) {
+      return role === 'matricStudent' ? 'Second Chance student' : role;
     }
     const welcomeMessage = document.getElementById('welcomeMessage');
     const summaryText = document.getElementById('summaryText');
@@ -360,7 +364,7 @@
         <div class="stat-tile"><span class="stat-value">${roleCounts.student}</span><span class="stat-label">Students</span></div>
         <div class="stat-tile"><span class="stat-value">${roleCounts.tutor}</span><span class="stat-label">Tutors</span></div>
         <div class="stat-tile"><span class="stat-value">${roleCounts.parent}</span><span class="stat-label">Parents</span></div>
-        <div class="stat-tile"><span class="stat-value">${roleCounts.matricStudent}</span><span class="stat-label">Matric students</span></div>
+        <div class="stat-tile"><span class="stat-value">${roleCounts.matricStudent}</span><span class="stat-label">Second Chance students</span></div>
         <div class="stat-tile"><span class="stat-value">${roleCounts.admin}</span><span class="stat-label">Admins</span></div>
       `;
 
@@ -437,7 +441,7 @@
             <button class="action-btn secondary" data-subject-id="${s.id}" type="button">Remove</button>
           </li>
         `).join('')
-        : '<li>No subjects yet — add the NSC subjects your matric re-write students need.</li>';
+        : '<li>No subjects yet — add the NSC subjects your Second Chance students need.</li>';
 
       const subjectOptions = allMatricSubjects.map((s) => `<option value="${s.name}">${s.name}</option>`).join('');
       matricGroupSubject.innerHTML = '<option value="">Choose a subject…</option>' + subjectOptions;
@@ -658,14 +662,14 @@
         const isSelf = account.id === currentUid;
         const disabledBadge = account.disabled ? ' <span class="status-badge" style="background:#fee2e2;color:#b91c1c;">disabled</span>' : '';
         const roleOptions = ['student', 'tutor', 'parent', 'matricStudent', 'admin']
-          .map((r) => `<option value="${r}" ${r === account.role ? 'selected' : ''}>${r}</option>`)
+          .map((r) => `<option value="${r}" ${r === account.role ? 'selected' : ''}>${roleLabel(r)}</option>`)
           .join('');
 
         return `
           <li>
             <div>
               <strong>${account.name || '(no name)'}</strong> — ${account.email}
-              <span class="status-badge">${account.role}</span>${disabledBadge}${isSelf ? ' (you)' : ''}
+              <span class="status-badge">${roleLabel(account.role)}</span>${disabledBadge}${isSelf ? ' (you)' : ''}
             </div>
             ${isSelf ? '' : `
               <div class="dashboard-actions">
@@ -739,12 +743,12 @@
       const currentData = userDocSnap.data();
 
       roleLookupResult.innerHTML = `
-        <p>Current role: <strong>${currentData.role}</strong></p>
+        <p>Current role: <strong>${roleLabel(currentData.role)}</strong></p>
         <div class="dashboard-actions">
           <button class="action-btn" data-role="student" type="button">Set student</button>
           <button class="action-btn" data-role="tutor" type="button">Set tutor</button>
           <button class="action-btn" data-role="parent" type="button">Set parent</button>
-          <button class="action-btn" data-role="matricStudent" type="button">Set matric student</button>
+          <button class="action-btn" data-role="matricStudent" type="button">Set Second Chance student</button>
           <button class="action-btn" data-role="admin" type="button">Set admin</button>
         </div>
         ${currentData.role === 'parent' ? `
@@ -762,7 +766,7 @@
             updates.childUids = [];
           }
           await updateDoc(doc(db, 'users', userDocSnap.id), updates);
-          roleLookupResult.innerHTML = `<p>Updated. Current role: <strong>${button.dataset.role}</strong></p>`;
+          roleLookupResult.innerHTML = `<p>Updated. Current role: <strong>${roleLabel(button.dataset.role)}</strong></p>`;
         });
       });
 
@@ -809,8 +813,8 @@
         const response = await createAccountCallable({ email, password, name, role, subject, bio, grade, childEmails });
         const data = response.data;
         let message = data.tempPassword
-          ? `<p>Created ${data.email} as ${data.role}.</p><p>Temporary password: <strong>${data.tempPassword}</strong> — share this with them securely, it won't be shown again.</p>`
-          : `<p>Created ${data.email} as ${data.role}.</p>`;
+          ? `<p>Created ${data.email} as ${roleLabel(data.role)}.</p><p>Temporary password: <strong>${data.tempPassword}</strong> — share this with them securely, it won't be shown again.</p>`
+          : `<p>Created ${data.email} as ${roleLabel(data.role)}.</p>`;
         if (data.role === 'parent') {
           message += `<p>Linked ${data.childrenLinked || 0} student(s).${data.childEmailsNotFound ? ` Not found: ${data.childEmailsNotFound.join(', ')}` : ''}</p>`;
         }
