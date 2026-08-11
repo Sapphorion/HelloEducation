@@ -182,6 +182,17 @@
         <ul id="matricQuestionsList"><li>Loading…</li></ul>
       </div>
 
+      <div class="dashboard-card">
+        <h3>Change password</h3>
+        <form id="changePasswordForm" class="admin-form">
+          <input id="currentPassword" type="password" placeholder="Current password" required />
+          <input id="newPassword" type="password" placeholder="New password (min. 8 characters)" required />
+          <input id="confirmPassword" type="password" placeholder="Confirm new password" required />
+          <button type="submit">Update password</button>
+        </form>
+        <p class="auth-feedback" id="changePasswordFeedback"></p>
+      </div>
+
       <button id="signOutBtn" type="button">Sign Out</button>
     </section>
   </main>
@@ -192,7 +203,7 @@
 
   <script type="module">
     import { initializeApp } from 'https://www.gstatic.com/firebasejs/12.4.0/firebase-app.js';
-    import { getAuth, onAuthStateChanged, signOut } from 'https://www.gstatic.com/firebasejs/12.4.0/firebase-auth.js';
+    import { getAuth, onAuthStateChanged, signOut, EmailAuthProvider, reauthenticateWithCredential, updatePassword } from 'https://www.gstatic.com/firebasejs/12.4.0/firebase-auth.js';
     import { getFirestore, collection, query, where, orderBy, getDocs, getDoc, addDoc, deleteDoc, updateDoc, doc, Timestamp, serverTimestamp, writeBatch } from 'https://www.gstatic.com/firebasejs/12.4.0/firebase-firestore.js';
     import { getFunctions, httpsCallable } from 'https://www.gstatic.com/firebasejs/12.4.0/firebase-functions.js';
     import { firebaseConfig, isFirebaseConfigured } from './firebase-config.js';
@@ -241,6 +252,8 @@
     const matricAssignFeedback = document.getElementById('matricAssignFeedback');
     const matricAssignmentsList = document.getElementById('matricAssignmentsList');
     const signOutBtn = document.getElementById('signOutBtn');
+    const changePasswordForm = document.getElementById('changePasswordForm');
+    const changePasswordFeedback = document.getElementById('changePasswordFeedback');
 
     async function renderQuestions() {
       if (!auth.currentUser) return;
@@ -803,6 +816,36 @@
       renderMyMatricAssignments();
       renderMatricQuestions();
       renderMaterials();
+    });
+
+    changePasswordForm.addEventListener('submit', async (event) => {
+      event.preventDefault();
+      changePasswordFeedback.textContent = '';
+
+      const currentPassword = document.getElementById('currentPassword').value;
+      const newPassword = document.getElementById('newPassword').value;
+      const confirmPassword = document.getElementById('confirmPassword').value;
+
+      if (newPassword.length < 8) {
+        changePasswordFeedback.textContent = 'New password must be at least 8 characters.';
+        return;
+      }
+      if (newPassword !== confirmPassword) {
+        changePasswordFeedback.textContent = 'New passwords do not match.';
+        return;
+      }
+
+      try {
+        const credential = EmailAuthProvider.credential(auth.currentUser.email, currentPassword);
+        await reauthenticateWithCredential(auth.currentUser, credential);
+        await updatePassword(auth.currentUser, newPassword);
+        changePasswordFeedback.textContent = 'Password updated.';
+        changePasswordForm.reset();
+      } catch (error) {
+        changePasswordFeedback.textContent = (error.code === 'auth/wrong-password' || error.code === 'auth/invalid-credential')
+          ? 'Current password is incorrect.'
+          : (error.message || 'Could not update password.');
+      }
     });
 
     signOutBtn.addEventListener('click', async () => {
