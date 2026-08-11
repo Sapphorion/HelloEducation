@@ -182,6 +182,24 @@ service cloud.firestore {
       allow create, update, delete: if isAdmin(request.auth.uid);
     }
 
+    // Materials attached to one specific dated occurrence of a recurring
+    // matricGroups class slot (identified by groupId + date). tutorId and
+    // studentIds are copied from the group at creation time so reads don't
+    // need a cross-document get() — same denormalization matricGroups itself
+    // already uses.
+    match /matricSessionMaterials/{materialId} {
+      allow read: if signedIn() && (
+        isAdmin(request.auth.uid)
+        || resource.data.tutorId == request.auth.uid
+        || request.auth.uid in resource.data.studentIds
+      );
+      allow create: if signedIn() && (
+        isAdmin(request.auth.uid)
+        || (isTutor(request.auth.uid) && request.resource.data.tutorId == request.auth.uid)
+      );
+      allow delete: if isAdmin(request.auth.uid) || resource.data.createdBy == request.auth.uid;
+    }
+
     // Tasks/assessments for the matric re-write programme. Same shape as
     // assignments/{assignmentId} above, kept as a separate collection since
     // matric students are a separate role.

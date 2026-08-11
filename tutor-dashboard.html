@@ -333,6 +333,24 @@
     let allMyMatricGroups = [];
     let matricStudentById = {};
 
+    function toDateKey(d) {
+      const y = d.getFullYear();
+      const m = String(d.getMonth() + 1).padStart(2, '0');
+      const day = String(d.getDate()).padStart(2, '0');
+      return `${y}-${m}-${day}`;
+    }
+
+    function nextOccurrences(dayOfWeek, count) {
+      const dates = [];
+      const cursor = new Date();
+      cursor.setHours(0, 0, 0, 0);
+      while (dates.length < count) {
+        if (cursor.getDay() === dayOfWeek) dates.push(new Date(cursor));
+        cursor.setDate(cursor.getDate() + 1);
+      }
+      return dates;
+    }
+
     async function renderMyMatricGroups() {
       if (!auth.currentUser) return;
       const groupsQuery = query(collection(db, 'matricGroups'), where('tutorId', '==', auth.currentUser.uid));
@@ -351,7 +369,10 @@
       matricGroupsList.innerHTML = allMyMatricGroups.length
         ? allMyMatricGroups.map((g) => {
           const roster = (g.studentIds || []).map((uid) => matricStudentById[uid]?.email || uid).join(', ') || 'No students enrolled yet';
-          return `<li><strong>${g.subject}</strong> — ${DAY_NAMES[g.dayOfWeek]} ${g.startTime}–${g.endTime} <span class="status-badge">${(g.studentIds || []).length}/${g.capacity || 4}</span>${g.meetingLink ? ` — <a href="${g.meetingLink}" target="_blank" rel="noopener">Join session</a>` : ''}<br>${roster}</li>`;
+          const upcoming = nextOccurrences(g.dayOfWeek, 3)
+            .map((date) => `<a class="week-event" href="matric-session.html?groupId=${g.id}&date=${toDateKey(date)}">${date.toLocaleDateString(undefined, { day: 'numeric', month: 'short' })}</a>`)
+            .join('');
+          return `<li><strong>${g.subject}</strong> — ${DAY_NAMES[g.dayOfWeek]} ${g.startTime}–${g.endTime} <span class="status-badge">${(g.studentIds || []).length}/${g.capacity || 4}</span>${g.meetingLink ? ` — <a href="${g.meetingLink}" target="_blank" rel="noopener">Join session</a>` : ''}<br>${roster}<div class="card-hint">Add materials for an upcoming session:</div><div class="dashboard-actions">${upcoming}</div></li>`;
         }).join('')
         : '<li>No Second Chance class slots assigned to you yet.</li>';
 

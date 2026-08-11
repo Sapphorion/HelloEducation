@@ -28,8 +28,13 @@
 
       <div class="dashboard-card">
         <h3>My weekly timetable</h3>
-        <p class="card-hint">Your fixed class slots, Monday–Thursday, 9am–3pm. The same video link is used every week.</p>
-        <ul id="timetableList"><li>Loading…</li></ul>
+        <p class="card-hint">Click a class to join the session or see that day's materials. The same video link is used every week, Monday–Thursday, 9am–3pm.</p>
+        <div class="week-nav">
+          <button id="prevWeekBtn" class="action-btn secondary" type="button">&larr; Previous</button>
+          <span class="week-nav-label" id="weekLabel"></span>
+          <button id="nextWeekBtn" class="action-btn secondary" type="button">Next &rarr;</button>
+        </div>
+        <div class="week-calendar" id="weekCalendar"><p>Loading…</p></div>
       </div>
 
       <div class="dashboard-card">
@@ -101,7 +106,10 @@
     const askAICallable = httpsCallable(functions, 'askAI');
     const welcomeMessage = document.getElementById('welcomeMessage');
     const summaryText = document.getElementById('summaryText');
-    const timetableList = document.getElementById('timetableList');
+    const weekCalendar = document.getElementById('weekCalendar');
+    const weekLabel = document.getElementById('weekLabel');
+    const prevWeekBtn = document.getElementById('prevWeekBtn');
+    const nextWeekBtn = document.getElementById('nextWeekBtn');
     const taskList = document.getElementById('taskList');
     const resourceList = document.getElementById('resourceList');
     const aiChatLog = document.getElementById('aiChatLog');
@@ -114,19 +122,78 @@
     const questionsList = document.getElementById('questionsList');
     const signOutBtn = document.getElementById('signOutBtn');
 
+    let myGroups = [];
+    let currentWeekStart = getMonday(new Date());
+
+    function getMonday(d) {
+      const date = new Date(d);
+      const day = date.getDay();
+      const diff = day === 0 ? -6 : 1 - day;
+      date.setDate(date.getDate() + diff);
+      date.setHours(0, 0, 0, 0);
+      return date;
+    }
+
+    function toDateKey(d) {
+      const y = d.getFullYear();
+      const m = String(d.getMonth() + 1).padStart(2, '0');
+      const day = String(d.getDate()).padStart(2, '0');
+      return `${y}-${m}-${day}`;
+    }
+
+    function renderCalendar() {
+      const weekEnd = new Date(currentWeekStart);
+      weekEnd.setDate(weekEnd.getDate() + 3);
+      weekLabel.textContent = `${currentWeekStart.toLocaleDateString(undefined, { day: 'numeric', month: 'short' })} – ${weekEnd.toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' })}`;
+
+      const days = [1, 2, 3, 4].map((offset) => {
+        const date = new Date(currentWeekStart);
+        date.setDate(date.getDate() + (offset - 1));
+        return { dayOfWeek: offset, date };
+      });
+
+      weekCalendar.innerHTML = days.map(({ dayOfWeek, date }) => {
+        const dayGroups = myGroups
+          .filter((g) => g.dayOfWeek === dayOfWeek)
+          .sort((a, b) => a.startTime.localeCompare(b.startTime));
+
+        const events = dayGroups.length
+          ? dayGroups.map((g) => `
+            <a class="week-event" href="matric-session.html?groupId=${g.id}&date=${toDateKey(date)}">
+              ${g.subject}
+              <span class="week-event-time">${g.startTime}–${g.endTime}</span>
+            </a>
+          `).join('')
+          : '<p class="week-day-empty">No classes</p>';
+
+        return `
+          <div class="week-day">
+            <h4>${DAY_NAMES[dayOfWeek]} ${date.getDate()}</h4>
+            ${events}
+          </div>
+        `;
+      }).join('');
+    }
+
+    prevWeekBtn.addEventListener('click', () => {
+      currentWeekStart.setDate(currentWeekStart.getDate() - 7);
+      renderCalendar();
+    });
+
+    nextWeekBtn.addEventListener('click', () => {
+      currentWeekStart.setDate(currentWeekStart.getDate() + 7);
+      renderCalendar();
+    });
+
     async function renderTimetable() {
       if (!auth.currentUser) return;
       const groupsQuery = query(collection(db, 'matricGroups'), where('studentIds', 'array-contains', auth.currentUser.uid));
       const snapshot = await getDocs(groupsQuery);
-      const groups = snapshot.docs
-        .map((docSnap) => docSnap.data())
-        .sort((a, b) => a.dayOfWeek - b.dayOfWeek || a.startTime.localeCompare(b.startTime));
+      myGroups = snapshot.docs.map((docSnap) => ({ id: docSnap.id, ...docSnap.data() }));
 
-      timetableList.innerHTML = groups.length
-        ? groups.map((g) => `<li><strong>${g.subject}</strong> — ${DAY_NAMES[g.dayOfWeek]} ${g.startTime}–${g.endTime} — ${g.tutorName}${g.meetingLink ? ` — <a href="${g.meetingLink}" target="_blank" rel="noopener">Join session</a>` : ''}</li>`).join('')
-        : '<li>Not enrolled in any classes yet — contact the HelloEducation admin.</li>';
+      renderCalendar();
 
-      const tutorsByGroup = [...new Map(groups.map((g) => [g.tutorId, g])).values()];
+      const tutorsByGroup = [...new Map(myGroups.map((g) => [g.tutorId, g])).values()];
       askTutor.innerHTML = tutorsByGroup.length
         ? '<option value="">Choose a tutor…</option>' + tutorsByGroup.map((g) => `<option value="${g.tutorId}" data-subject="${g.subject}">${g.tutorName} — ${g.subject}</option>`).join('')
         : '<option value="">No enrolled classes yet</option>';

@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>HelloEducation Second Chance Session</title>
+  <link rel="stylesheet" href="styling.css" />
+</head>
+<body>
+  <header>
+    <h1>HelloEducation</h1>
+    <h1 class="page-heading">Session Details</h1>
+  </header>
+
+  <navigation>
+    <ul>
+      <li><a href="index.html">Home</a></li>
+      <li><a href="services.html">Services</a></li>
+      <li><a href="tutors.html">Tutors</a></li>
+      <li><a href="contact.html">Contact</a></li>
+    </ul>
+  </navigation>
+
+  <main class="auth-page">
+    <section class="auth-panel dashboard-panel">
+      <button id="backBtn" class="action-btn secondary" type="button">&larr; Back</button>
+
+      <div id="sessionContent">
+        <p class="auth-feedback" id="loadFeedback">Loading session…</p>
+      </div>
+    </section>
+  </main>
+
+  <footer>
+    <p>&copy; 2023 HelloEducation. All rights reserved.</p>
+  </footer>
+
+  <script type="module">
+    import { initializeApp } from 'https://www.gstatic.com/firebasejs/12.4.0/firebase-app.js';
+    import { getAuth, onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/12.4.0/firebase-auth.js';
+    import { getFirestore, collection, query, where, getDoc, getDocs, doc, addDoc, deleteDoc, serverTimestamp } from 'https://www.gstatic.com/firebasejs/12.4.0/firebase-firestore.js';
+    import { firebaseConfig, isFirebaseConfigured } from './firebase-config.js';
+
+    const DAY_NAMES = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+
+    const params = new URLSearchParams(window.location.search);
+    const groupId = params.get('groupId');
+    const dateKey = params.get('date');
+
+    const app = initializeApp(firebaseConfig);
+    const auth = getAuth(app);
+    const db = getFirestore(app);
+    const sessionContent = document.getElementById('sessionContent');
+    const loadFeedback = document.getElementById('loadFeedback');
+
+    document.getElementById('backBtn').addEventListener('click', () => {
+      if (window.history.length > 1) {
+        window.history.back();
+      } else {
+        window.location.href = 'login.html';
+      }
+    });
+
+    function escapeHtml(str) {
+      const div = document.createElement('div');
+      div.textContent = str;
+      return div.innerHTML;
+    }
+
+    async function renderMaterials(group, isManager) {
+      const materialsQuery = query(
+        collection(db, 'matricSessionMaterials'),
+        where('groupId', '==', groupId),
+        where('date', '==', dateKey)
+      );
+      const snapshot = await getDocs(materialsQuery);
+      const materials = snapshot.docs.map((docSnap) => ({ id: docSnap.id, ...docSnap.data() }));
+
+      const list = document.getElementById('materialsList');
+      list.innerHTML = materials.length
+        ? materials.map((m) => `
+          <li>
+            <a href="${m.url}" target="_blank" rel="noopener">${escapeHtml(m.title)}</a>
+            ${isManager ? `<button class="action-btn secondary" data-delete-material="${m.id}" type="button">Remove</button>` : ''}
+          </li>
+        `).join('')
+        : '<li>No materials posted for this session yet.</li>';
+
+      list.querySelectorAll('button[data-delete-material]').forEach((button) => {
+        button.addEventListener('click', async () => {
+          await deleteDoc(doc(db, 'matricSessionMaterials', button.dataset.deleteMaterial));
+          await renderMaterials(group, isManager);
+        });
+      });
+    }
+
+    async function loadSession(user) {
+      if (!groupId || !dateKey || !/^\d{4}-\d{2}-\d{2}$/.test(dateKey)) {
+        loadFeedback.textContent = 'This session link looks invalid.';
+        return;
+      }
+
+      let groupSnap;
+      try {
+        groupSnap = await getDoc(doc(db, 'matricGroups', groupId));
+      } catch (error) {
+        loadFeedback.textContent = "You don't have access to this session.";
+        return;
+      }
+
+      if (!groupSnap.exists()) {
+        loadFeedback.textContent = 'This class slot no longer exists.';
+        return;
+      }
+
+      const group = groupSnap.data();
+      const sessionDate = new Date(`${dateKey}T00:00:00`);
+      if (sessionDate.getDay() !== group.dayOfWeek) {
+        loadFeedback.textContent = 'This session date does not match the class schedule.';
+        return;
+      }
+
+      const role = localStorage.getItem('helloEducationRole');
+      const isTutorManager = role === 'tutor' && group.tutorId === user.uid;
+      const isAdminManager = role === 'admin';
+      const isManager = isTutorManager || isAdminManager;
+
+      const dateLabel = sessionDate.toLocaleDateString(undefined, { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
+
+      sessionContent.innerHTML = `
+        <div class="session-hero">
+          <h2>${escapeHtml(group.subject)}</h2>
+          <p>${dateLabel} — ${group.startTime}–${group.endTime}</p>
+          <p>Tutor: ${escapeHtml(group.tutorName || '')}</p>
+          ${group.meetingLink ? `<div class="btn-stack"><a class="book-btn" href="${group.meetingLink}" target="_blank" rel="noopener">Join session</a></div>` : '<p class="card-hint">No video link set for this class yet.</p>'}
+        </div>
+
+        <div class="dashboard-card">
+          <h3>Session materials</h3>
+          <ul id="materialsList"><li>Loading…</li></ul>
+        </div>
+
+        ${isManager ? `
+          <div class="dashboard-card">
+            <h3>Add material</h3>
+            <form id="addMaterialForm" class="admin-form">
+              <input id="materialTitle" type="text" placeholder="Title (e.g. Worksheet, Recording, Notes)" required />
+              <input id="materialUrl" type="url" placeholder="Link" required />
+              <button type="submit">Add</button>
+            </form>
+            <p class="auth-feedback" id="materialFeedback"></p>
+          </div>
+        ` : ''}
+      `;
+
+      await renderMaterials(group, isManager);
+
+      if (isManager) {
+        document.getElementById('addMaterialForm').addEventListener('submit', async (event) => {
+          event.preventDefault();
+          const materialFeedback = document.getElementById('materialFeedback');
+          const title = document.getElementById('materialTitle').value.trim();
+          const url = document.getElementById('materialUrl').value.trim();
+
+          await addDoc(collection(db, 'matricSessionMaterials'), {
+            groupId,
+            date: dateKey,
+            subject: group.subject,
+            tutorId: group.tutorId,
+            studentIds: group.studentIds || [],
+            title,
+            url,
+            createdBy: user.uid,
+            createdAt: serverTimestamp()
+          });
+
+          materialFeedback.textContent = 'Added.';
+          event.target.reset();
+          await renderMaterials(group, isManager);
+        });
+      }
+    }
+
+    onAuthStateChanged(auth, (user) => {
+      if (!user && !isFirebaseConfigured()) {
+        loadFeedback.textContent = 'Demo mode is active — session details need a connected Firebase project.';
+        return;
+      }
+
+      if (!user) {
+        window.location.href = 'login.html';
+        return;
+      }
+
+      loadSession(user);
+    });
+  </script>
+</body>
+</html>
