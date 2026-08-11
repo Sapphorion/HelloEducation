@@ -14,6 +14,11 @@ setGlobalOptions({ maxInstances: 5 });
 
 const anthropicApiKey = defineSecret('ANTHROPIC_API_KEY');
 const zohoAppPassword = defineSecret('ZOHO_APP_PASSWORD');
+const zohoBooksClientId = defineSecret('ZOHO_BOOKS_CLIENT_ID');
+const zohoBooksClientSecret = defineSecret('ZOHO_BOOKS_CLIENT_SECRET');
+const zohoBooksRefreshToken = defineSecret('ZOHO_BOOKS_REFRESH_TOKEN');
+const zohoBooksOrgId = defineSecret('ZOHO_BOOKS_ORG_ID');
+const ZOHO_BOOKS_SECRETS = [zohoBooksClientId, zohoBooksClientSecret, zohoBooksRefreshToken, zohoBooksOrgId];
 
 // The mailbox everything is sent from — not secret (it's the visible "from"
 // address), so it's a plain constant rather than another secret to set up.
@@ -51,6 +56,77 @@ async function sendEmail({ to, subject, html }) {
   } catch (error) {
     console.error(`Failed to send email to ${to}:`, error.message || error);
   }
+}
+
+// --- Zoho Books billing integration (invoices/statements for parents) ---
+const ZOHO_ACCOUNTS_URL = 'https://accounts.zoho.com';
+const ZOHO_BOOKS_API_URL = 'https://www.zohoapis.com/books/v3';
+
+let cachedZohoBooksToken = null;
+let cachedZohoBooksTokenExpiry = 0;
+
+async function getZohoBooksAccessToken() {
+  const now = Date.now();
+  if (cachedZohoBooksToken && now < cachedZohoBooksTokenExpiry - 60000) {
+    return cachedZohoBooksToken;
+  }
+
+  const params = new URLSearchParams({
+    grant_type: 'refresh_token',
+    client_id: zohoBooksClientId.value(),
+    client_secret: zohoBooksClientSecret.value(),
+    refresh_token: zohoBooksRefreshToken.value()
+  });
+  const response = await fetch(`${ZOHO_ACCOUNTS_URL}/oauth/v2/token?${params.toString()}`, { method: 'POST' });
+  const data = await response.json();
+  if (!data.access_token) {
+    throw new Error(`Zoho Books authentication failed: ${data.error || 'unknown error'}`);
+  }
+
+  cachedZohoBooksToken = data.access_token;
+  cachedZohoBooksTokenExpiry = now + (data.expires_in || 3600) * 1000;
+  return cachedZohoBooksToken;
+}
+
+async function zohoBooksGet(path, extraParams = {}) {
+  const accessToken = await getZohoBooksAccessToken();
+  const params = new URLSearchParams({ organization_id: zohoBooksOrgId.value(), ...extraParams });
+  const response = await fetch(`${ZOHO_BOOKS_API_URL}${path}?${params.toString()}`, {
+    headers: { Authorization: `Zoho-oauthtoken ${accessToken}` }
+  });
+  const data = await response.json();
+  if (typeof data.code === 'number' && data.code !== 0) {
+    throw new Error(`Zoho Books API error: ${data.message || data.code}`);
+  }
+  return data;
+}
+
+async function zohoBooksGetPdfBase64(path, extraParams = {}) {
+  const accessToken = await getZohoBooksAccessToken();
+  const params = new URLSearchParams({ organization_id: zohoBooksOrgId.value(), ...extraParams });
+  const response = await fetch(`${ZOHO_BOOKS_API_URL}${path}?${params.toString()}`, {
+    headers: { Authorization: `Zoho-oauthtoken ${accessToken}` }
+  });
+  if (!response.ok) {
+    throw new Error(`Zoho Books PDF request failed (${response.status})`);
+  }
+  const arrayBuffer = await response.arrayBuffer();
+  return Buffer.from(arrayBuffer).toString('base64');
+}
+
+// Looks up the Zoho Books contact (customer) whose email matches the
+// parent's own Firebase Auth email. email_contains narrows the request, but
+// the exact-match filter below is the real security boundary — it protects
+// against Zoho ignoring/loosely-matching that query param and handing back
+// contacts that merely resemble the search term.
+async function findZohoContactIdByEmail(email) {
+  const normalizedEmail = (email || '').trim().toLowerCase();
+  if (!normalizedEmail) return null;
+
+  const data = await zohoBooksGet('/contacts', { email_contains: normalizedEmail, per_page: '200' });
+  const contacts = data.contacts || [];
+  const match = contacts.find((c) => (c.email || '').trim().toLowerCase() === normalizedEmail);
+  return match ? match.contact_id : null;
 }
 
 const VALID_ROLES = ['student', 'tutor', 'admin', 'parent', 'matricStudent'];
@@ -120,6 +196,25 @@ async function requireAnyStudent(requestAuth) {
   }
 
   return { uid: callerUid, email: callerDoc.data().email };
+}
+
+// Uses request.auth.token.email — the verified Firebase Auth email from the
+// caller's ID token — rather than the Firestore users/{uid}.email field.
+// That Firestore field is self-editable (only role/childUids are locked down
+// by the rules), so trusting it here would let a parent point their own
+// account at another family's email and pull that family's Zoho invoices.
+async function requireParent(requestAuth) {
+  const callerUid = requestAuth?.uid;
+  if (!callerUid) {
+    throw new HttpsError('unauthenticated', 'You must be signed in.');
+  }
+
+  const callerDoc = await db.doc(`users/${callerUid}`).get();
+  if (!callerDoc.exists || callerDoc.data().role !== 'parent') {
+    throw new HttpsError('permission-denied', 'Only a parent can do this.');
+  }
+
+  return { uid: callerUid, email: requestAuth.token.email };
 }
 
 // Creates a Firebase Auth account plus its Firestore role/profile docs in one
@@ -654,6 +749,118 @@ exports.generateMaterial = onCall({ secrets: [anthropicApiKey] }, async (request
   });
 
   return { materialId: materialRef.id, content };
+});
+
+// Returns a parent's invoices, payments, and a computed account statement
+// from Zoho Books. Nothing is cached in Firestore — every call reads live
+// from Zoho, the same "always fresh, never stale financial data" rule the
+// service worker follows for the rest of the site.
+exports.getParentBilling = onCall({ secrets: ZOHO_BOOKS_SECRETS }, async (request) => {
+  const { email } = await requireParent(request.auth);
+
+  let contactId;
+  try {
+    contactId = await findZohoContactIdByEmail(email);
+  } catch (error) {
+    console.error('Zoho Books contact lookup failed:', error.message || error);
+    throw new HttpsError('internal', 'Could not reach the billing system. Please try again later.');
+  }
+
+  if (!contactId) {
+    return { linked: false, invoices: [], payments: [], statement: null };
+  }
+
+  let invoicesData, paymentsData;
+  try {
+    [invoicesData, paymentsData] = await Promise.all([
+      zohoBooksGet('/invoices', { customer_id: contactId, per_page: '200' }),
+      zohoBooksGet('/customerpayments', { customer_id: contactId, per_page: '200' })
+    ]);
+  } catch (error) {
+    console.error('Zoho Books billing fetch failed:', error.message || error);
+    throw new HttpsError('internal', 'Could not load your billing details. Please try again later.');
+  }
+
+  // Re-filtering by customer_id here (not just trusting the query param) is
+  // a defense-in-depth check against a family ever seeing another family's
+  // line items if Zoho's filter is ever loose or ignored.
+  const invoices = (invoicesData.invoices || [])
+    .filter((inv) => String(inv.customer_id) === String(contactId))
+    .map((inv) => ({
+      invoiceId: inv.invoice_id,
+      invoiceNumber: inv.invoice_number,
+      date: inv.date,
+      dueDate: inv.due_date,
+      status: inv.status,
+      total: Number(inv.total) || 0,
+      balance: Number(inv.balance) || 0
+    }))
+    .sort((a, b) => (a.date < b.date ? 1 : -1));
+
+  const payments = (paymentsData.customerpayments || [])
+    .filter((p) => String(p.customer_id) === String(contactId))
+    .map((p) => ({
+      paymentId: p.payment_id,
+      date: p.date,
+      amount: Number(p.amount) || 0,
+      reference: p.reference_number || p.payment_number || ''
+    }))
+    .sort((a, b) => (a.date < b.date ? 1 : -1));
+
+  const totalInvoiced = invoices.reduce((sum, inv) => sum + inv.total, 0);
+  const totalPaid = payments.reduce((sum, p) => sum + p.amount, 0);
+  const outstandingBalance = invoices.reduce((sum, inv) => sum + inv.balance, 0);
+
+  return {
+    linked: true,
+    invoices,
+    payments,
+    statement: { totalInvoiced, totalPaid, outstandingBalance }
+  };
+});
+
+// Streams a single invoice PDF back to the caller as base64. Ownership is
+// re-verified against Zoho directly (not just the customer_id filter used
+// for the list above) before any bytes are fetched, so a parent can't view
+// another family's invoice by guessing/enumerating an invoice ID.
+exports.getInvoicePdf = onCall({ secrets: ZOHO_BOOKS_SECRETS }, async (request) => {
+  const { email } = await requireParent(request.auth);
+  const { invoiceId } = request.data || {};
+  if (!invoiceId || typeof invoiceId !== 'string') {
+    throw new HttpsError('invalid-argument', 'An invoice ID is required.');
+  }
+
+  let contactId;
+  try {
+    contactId = await findZohoContactIdByEmail(email);
+  } catch (error) {
+    console.error('Zoho Books contact lookup failed:', error.message || error);
+    throw new HttpsError('internal', 'Could not reach the billing system. Please try again later.');
+  }
+  if (!contactId) {
+    throw new HttpsError('not-found', 'No billing account is linked to your email yet.');
+  }
+
+  let invoiceData;
+  try {
+    invoiceData = await zohoBooksGet(`/invoices/${encodeURIComponent(invoiceId)}`);
+  } catch (error) {
+    throw new HttpsError('not-found', 'Invoice not found.');
+  }
+  const invoice = invoiceData.invoice;
+  if (!invoice || String(invoice.customer_id) !== String(contactId)) {
+    throw new HttpsError('permission-denied', 'That invoice does not belong to your account.');
+  }
+
+  let pdfBase64;
+  try {
+    pdfBase64 = await zohoBooksGetPdfBase64('/invoices/pdf', { invoice_ids: invoiceId });
+  } catch (error) {
+    console.error('Zoho Books PDF fetch failed:', error.message || error);
+    throw new HttpsError('internal', 'Could not download the invoice PDF. Please try again later.');
+  }
+
+  return { pdfBase64, filename: `Invoice-${invoice.invoice_number || invoiceId}.pdf` };
 });
 
 // --- Email notifications for new assignments/resources/materials and

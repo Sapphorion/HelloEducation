@@ -35,6 +35,14 @@
 
       <div id="childrenContainer"></div>
 
+      <div class="dashboard-card" id="billingCard">
+        <h3>Invoices &amp; statement</h3>
+        <p class="card-hint" id="billingSummary">Loading billing details…</p>
+        <div id="billingStatement"></div>
+        <div id="billingInvoices"></div>
+        <p class="auth-feedback" id="billingFeedback"></p>
+      </div>
+
       <div class="dashboard-card">
         <h3>Change password</h3>
         <form id="changePasswordForm" class="admin-form">
@@ -58,6 +66,7 @@
     import { initializeApp } from 'https://www.gstatic.com/firebasejs/12.4.0/firebase-app.js';
     import { getAuth, onAuthStateChanged, signOut, EmailAuthProvider, reauthenticateWithCredential, updatePassword } from 'https://www.gstatic.com/firebasejs/12.4.0/firebase-auth.js';
     import { getFirestore, doc, getDoc, collection, query, where, orderBy, getDocs } from 'https://www.gstatic.com/firebasejs/12.4.0/firebase-firestore.js';
+    import { getFunctions, httpsCallable } from 'https://www.gstatic.com/firebasejs/12.4.0/firebase-functions.js';
     import { firebaseConfig, isFirebaseConfigured } from './firebase-config.js';
 
     const role = localStorage.getItem('helloEducationRole');
@@ -68,12 +77,19 @@
     const app = initializeApp(firebaseConfig);
     const auth = getAuth(app);
     const db = getFirestore(app);
+    const functions = getFunctions(app);
+    const getParentBillingCallable = httpsCallable(functions, 'getParentBilling');
+    const getInvoicePdfCallable = httpsCallable(functions, 'getInvoicePdf');
     const welcomeMessage = document.getElementById('welcomeMessage');
     const summaryText = document.getElementById('summaryText');
     const childrenContainer = document.getElementById('childrenContainer');
     const signOutBtn = document.getElementById('signOutBtn');
     const changePasswordForm = document.getElementById('changePasswordForm');
     const changePasswordFeedback = document.getElementById('changePasswordFeedback');
+    const billingSummary = document.getElementById('billingSummary');
+    const billingStatement = document.getElementById('billingStatement');
+    const billingInvoices = document.getElementById('billingInvoices');
+    const billingFeedback = document.getElementById('billingFeedback');
 
     async function renderChild(studentId) {
       const studentDoc = await getDoc(doc(db, 'students', studentId));
@@ -129,10 +145,81 @@
       summaryText.textContent = `Showing ${childUids.length} linked ${childUids.length === 1 ? 'child' : 'children'}.`;
     }
 
+    function statusLabel(status) {
+      return (status || '').replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase()) || 'Unknown';
+    }
+
+    function formatCurrency(amount) {
+      return `R${(Number(amount) || 0).toFixed(2)}`;
+    }
+
+    async function renderBilling() {
+      billingSummary.textContent = 'Loading billing details…';
+      billingStatement.innerHTML = '';
+      billingInvoices.innerHTML = '';
+      billingFeedback.textContent = '';
+
+      try {
+        const result = await getParentBillingCallable();
+        const { linked, invoices, payments, statement } = result.data;
+
+        if (!linked) {
+          billingSummary.textContent = 'No billing account is linked to your email yet. Contact the HelloEducation admin if you believe this is a mistake.';
+          return;
+        }
+
+        billingSummary.textContent = `${invoices.length} ${invoices.length === 1 ? 'invoice' : 'invoices'} on file.`;
+
+        billingStatement.innerHTML = `
+          <div class="dashboard-card">
+            <h4>Account statement</h4>
+            <p>Total invoiced: ${formatCurrency(statement.totalInvoiced)}</p>
+            <p>Total paid: ${formatCurrency(statement.totalPaid)}</p>
+            <p><strong>Outstanding balance: ${formatCurrency(statement.outstandingBalance)}</strong></p>
+            ${payments.length ? `<h4>Payments</h4><ul>${payments.map((p) => `<li>${p.date} — ${formatCurrency(p.amount)}${p.reference ? ` (${p.reference})` : ''}</li>`).join('')}</ul>` : ''}
+          </div>
+        `;
+
+        billingInvoices.innerHTML = invoices.length
+          ? `<ul>${invoices.map((inv) => `
+              <li>
+                <span>${inv.invoiceNumber} — ${inv.date} <span class="status-badge">${statusLabel(inv.status)}</span> — ${formatCurrency(inv.total)}${inv.balance > 0 ? ` (${formatCurrency(inv.balance)} due)` : ''}</span>
+                <button type="button" class="action-btn view-invoice-btn" data-invoice-id="${inv.invoiceId}">View PDF</button>
+              </li>
+            `).join('')}</ul>`
+          : '<p>No invoices yet.</p>';
+      } catch (error) {
+        billingSummary.textContent = error.message || 'Could not load your billing details.';
+      }
+    }
+
+    billingInvoices.addEventListener('click', async (event) => {
+      const btn = event.target.closest('.view-invoice-btn');
+      if (!btn) return;
+
+      billingFeedback.textContent = 'Loading PDF…';
+      btn.disabled = true;
+      try {
+        const result = await getInvoicePdfCallable({ invoiceId: btn.dataset.invoiceId });
+        const { pdfBase64 } = result.data;
+        const byteChars = atob(pdfBase64);
+        const byteNumbers = new Array(byteChars.length);
+        for (let i = 0; i < byteChars.length; i++) byteNumbers[i] = byteChars.charCodeAt(i);
+        const blob = new Blob([new Uint8Array(byteNumbers)], { type: 'application/pdf' });
+        window.open(URL.createObjectURL(blob), '_blank');
+        billingFeedback.textContent = '';
+      } catch (error) {
+        billingFeedback.textContent = error.message || 'Could not load the invoice PDF.';
+      } finally {
+        btn.disabled = false;
+      }
+    });
+
     onAuthStateChanged(auth, async (user) => {
       if (!user && !isFirebaseConfigured()) {
         welcomeMessage.textContent = `Welcome back, ${localStorage.getItem('helloEducationUser') || 'parent'}!`;
         summaryText.textContent = 'Demo mode is active. Connect Firebase to see real data.';
+        billingSummary.textContent = 'Billing is unavailable in demo mode.';
         return;
       }
 
@@ -144,6 +231,7 @@
       const userDocSnap = await getDoc(doc(db, 'users', user.uid));
       welcomeMessage.textContent = `Welcome back, ${(userDocSnap.exists() && userDocSnap.data().name) || user.email || 'parent'}!`;
       renderChildren();
+      renderBilling();
     });
 
     changePasswordForm.addEventListener('submit', async (event) => {

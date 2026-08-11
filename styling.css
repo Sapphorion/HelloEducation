@@ -282,6 +282,11 @@ navigation a:hover {
   color: #1e3a8a;
 }
 
+.dashboard-card h4 {
+  margin: 0.7rem 0 0.5rem;
+  color: #1e3a8a;
+}
+
 .dashboard-card ul {
   list-style: none;
   display: flex;
