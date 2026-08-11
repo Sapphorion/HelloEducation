@@ -23,6 +23,14 @@
         { "fieldPath": "role", "order": "ASCENDING" },
         { "fieldPath": "childUids", "arrayConfig": "CONTAINS" }
       ]
+    },
+    {
+      "collectionGroup": "sessions",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "status", "order": "ASCENDING" },
+        { "fieldPath": "scheduledAt", "order": "ASCENDING" }
+      ]
     }
   ],
   "fieldOverrides": []

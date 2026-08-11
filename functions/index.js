@@ -1,18 +1,57 @@
 const { onCall, HttpsError } = require('firebase-functions/v2/https');
 const { setGlobalOptions } = require('firebase-functions/v2');
 const { defineSecret } = require('firebase-functions/params');
+const { onDocumentCreated, onDocumentUpdated } = require('firebase-functions/v2/firestore');
+const { onSchedule } = require('firebase-functions/v2/scheduler');
 const { initializeApp } = require('firebase-admin/app');
 const { getFirestore, FieldValue, Timestamp } = require('firebase-admin/firestore');
 const { getAuth } = require('firebase-admin/auth');
 const Anthropic = require('@anthropic-ai/sdk');
+const nodemailer = require('nodemailer');
 
 initializeApp();
 setGlobalOptions({ maxInstances: 5 });
 
 const anthropicApiKey = defineSecret('ANTHROPIC_API_KEY');
+const zohoAppPassword = defineSecret('ZOHO_APP_PASSWORD');
+
+// The mailbox everything is sent from — not secret (it's the visible "from"
+// address), so it's a plain constant rather than another secret to set up.
+const ZOHO_SENDER_EMAIL = 'info@helloeducation.co.za';
+const SITE_URL = 'https://helloeducation.co.za';
 
 const db = getFirestore();
 const auth = getAuth();
+
+let cachedTransporter = null;
+function getMailTransporter() {
+  if (!cachedTransporter) {
+    cachedTransporter = nodemailer.createTransport({
+      host: 'smtp.zoho.com',
+      port: 465,
+      secure: true,
+      auth: { user: ZOHO_SENDER_EMAIL, pass: zohoAppPassword.value() }
+    });
+  }
+  return cachedTransporter;
+}
+
+// Best-effort email send — failures are logged, never thrown, so a Zoho
+// hiccup can't break account creation, assignment posting, etc. for the
+// caller who triggered it.
+async function sendEmail({ to, subject, html }) {
+  if (!to) return;
+  try {
+    await getMailTransporter().sendMail({
+      from: `"HelloEducation" <${ZOHO_SENDER_EMAIL}>`,
+      to,
+      subject,
+      html
+    });
+  } catch (error) {
+    console.error(`Failed to send email to ${to}:`, error.message || error);
+  }
+}
 
 const VALID_ROLES = ['student', 'tutor', 'admin', 'parent', 'matricStudent'];
 
@@ -87,7 +126,7 @@ async function requireAnyStudent(requestAuth) {
 // step. Only callable by an existing admin — the client SDK can't safely do
 // this itself because creating a user with createUserWithEmailAndPassword()
 // signs the browser in as that new user, kicking out the admin's session.
-exports.createAccount = onCall(async (request) => {
+exports.createAccount = onCall({ secrets: [zohoAppPassword] }, async (request) => {
   const callerUid = await requireAdmin(request.auth);
 
   const { email, password, name, role, subject, bio, grade, childEmails } = request.data || {};
@@ -183,6 +222,23 @@ exports.createAccount = onCall(async (request) => {
   }
 
   await batch.commit();
+
+  const roleLabel = role === 'matricStudent' ? 'Second Chance Programme' : role;
+  await sendEmail({
+    to: email,
+    subject: 'Welcome to HelloEducation',
+    html: `
+      <p>Hi ${name},</p>
+      <p>An account has been created for you on HelloEducation as a <strong>${roleLabel}</strong>.</p>
+      ${usedGeneratedPassword ? `
+        <p>Your temporary password is: <strong>${finalPassword}</strong></p>
+        <p>Please sign in and keep it somewhere safe.</p>
+      ` : `
+        <p>You can sign in using the password your admin set up with you.</p>
+      `}
+      <p><a href="${SITE_URL}/login.html">Sign in to HelloEducation</a></p>
+    `
+  });
 
   return {
     uid: userRecord.uid,
@@ -598,4 +654,195 @@ exports.generateMaterial = onCall({ secrets: [anthropicApiKey] }, async (request
   });
 
   return { materialId: materialRef.id, content };
+});
+
+// --- Email notifications for new assignments/resources/materials and
+// question replies. All Firestore-triggered, so they fire regardless of
+// whether the write came from a client addDoc() or a Cloud Function — no
+// changes needed to the existing tutor/admin forms that create these docs.
+
+exports.onAssignmentCreated = onDocumentCreated({ document: 'assignments/{assignmentId}', secrets: [zohoAppPassword] }, async (event) => {
+  const a = event.data.data();
+  await sendEmail({
+    to: a.studentEmail,
+    subject: `New assignment: ${a.title}`,
+    html: `
+      <p>Hi,</p>
+      <p>Your tutor has assigned you something new: <strong>${a.title}</strong>.</p>
+      ${a.description ? `<p>${a.description}</p>` : ''}
+      <p><a href="${SITE_URL}/login.html?role=student">View it on HelloEducation</a></p>
+    `
+  });
+});
+
+exports.onMatricAssignmentCreated = onDocumentCreated({ document: 'matricAssignments/{assignmentId}', secrets: [zohoAppPassword] }, async (event) => {
+  const a = event.data.data();
+  const kind = a.type === 'assessment' ? 'assessment' : 'task';
+  await sendEmail({
+    to: a.studentEmail,
+    subject: `New ${kind}: ${a.title}`,
+    html: `
+      <p>Hi,</p>
+      <p>Your tutor has given you a new ${kind}: <strong>${a.title}</strong>${a.dueAt ? ` (due ${a.dueAt.toDate().toLocaleString('en-ZA', { timeZone: 'Africa/Johannesburg' })})` : ''}.</p>
+      ${a.description ? `<p>${a.description}</p>` : ''}
+      <p><a href="${SITE_URL}/login.html?role=matricStudent">View it on HelloEducation</a></p>
+    `
+  });
+});
+
+exports.onStudyResourceCreated = onDocumentCreated({ document: 'studyResources/{resourceId}', secrets: [zohoAppPassword] }, async (event) => {
+  const r = event.data.data();
+  await sendEmail({
+    to: r.studentEmail,
+    subject: `New study resource: ${r.title}`,
+    html: `
+      <p>Hi,</p>
+      <p>A new study resource has been shared with you: <strong>${r.title}</strong> (${r.type}).</p>
+      <p><a href="${SITE_URL}/login.html?role=student">View it on HelloEducation</a></p>
+    `
+  });
+});
+
+exports.onMatricStudyResourceCreated = onDocumentCreated({ document: 'matricStudyResources/{resourceId}', secrets: [zohoAppPassword] }, async (event) => {
+  const r = event.data.data();
+  await sendEmail({
+    to: r.studentEmail,
+    subject: `New study resource: ${r.title}`,
+    html: `
+      <p>Hi,</p>
+      <p>A new study resource has been shared with you: <strong>${r.title}</strong> (${r.type}).</p>
+      <p><a href="${SITE_URL}/login.html?role=matricStudent">View it on HelloEducation</a></p>
+    `
+  });
+});
+
+exports.onMatricSessionMaterialCreated = onDocumentCreated({ document: 'matricSessionMaterials/{materialId}', secrets: [zohoAppPassword] }, async (event) => {
+  const m = event.data.data();
+  const studentIds = m.studentIds || [];
+  await Promise.all(studentIds.map(async (studentId) => {
+    const studentDoc = await db.doc(`matricStudents/${studentId}`).get();
+    if (!studentDoc.exists) return;
+    await sendEmail({
+      to: studentDoc.data().email,
+      subject: `New session material: ${m.title}`,
+      html: `
+        <p>Hi,</p>
+        <p>New material has been posted for your ${m.subject} session on ${m.date}: <strong>${m.title}</strong>.</p>
+        <p><a href="${SITE_URL}/matric-session.html?groupId=${m.groupId}&date=${m.date}">View it on HelloEducation</a></p>
+      `
+    });
+  }));
+});
+
+exports.onQuestionAnswered = onDocumentUpdated({ document: 'questions/{questionId}', secrets: [zohoAppPassword] }, async (event) => {
+  const before = event.data.before.data();
+  const after = event.data.after.data();
+  if (before.status === 'answered' || after.status !== 'answered') return;
+  await sendEmail({
+    to: after.studentEmail,
+    subject: `Your tutor replied: ${after.subject}`,
+    html: `
+      <p>Hi,</p>
+      <p>Your tutor replied to your question about <strong>${after.subject}</strong>:</p>
+      <p>${after.reply}</p>
+      <p><a href="${SITE_URL}/login.html?role=student">View it on HelloEducation</a></p>
+    `
+  });
+});
+
+exports.onMatricQuestionAnswered = onDocumentUpdated({ document: 'matricQuestions/{questionId}', secrets: [zohoAppPassword] }, async (event) => {
+  const before = event.data.before.data();
+  const after = event.data.after.data();
+  if (before.status === 'answered' || after.status !== 'answered') return;
+  await sendEmail({
+    to: after.studentEmail,
+    subject: `Your tutor replied: ${after.subject}`,
+    html: `
+      <p>Hi,</p>
+      <p>Your tutor replied to your question about <strong>${after.subject}</strong>:</p>
+      <p>${after.reply}</p>
+      <p><a href="${SITE_URL}/login.html?role=matricStudent">View it on HelloEducation</a></p>
+    `
+  });
+});
+
+// --- Daily session reminders, 07:00 SAST. South Africa has no DST, so a
+// fixed +2h offset from UTC is always correct — no timezone library needed.
+
+function sastNow() {
+  return new Date(Date.now() + 2 * 60 * 60 * 1000);
+}
+
+// Returns the real UTC instants for the start/end of "today" in SAST, plus
+// a YYYY-MM-DD key for that SAST calendar date — computed via the shifted-
+// date trick above rather than a timezone library.
+function sastDayBoundsUtc() {
+  const shifted = sastNow();
+  const y = shifted.getUTCFullYear();
+  const m = shifted.getUTCMonth();
+  const d = shifted.getUTCDate();
+  const startUtc = new Date(Date.UTC(y, m, d, 0, 0, 0) - 2 * 60 * 60 * 1000);
+  const endUtc = new Date(Date.UTC(y, m, d, 23, 59, 59, 999) - 2 * 60 * 60 * 1000);
+  const dateKey = `${y}-${String(m + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+  return { startUtc, endUtc, dateKey };
+}
+
+exports.sendSessionReminders = onSchedule({
+  schedule: '0 7 * * *',
+  timeZone: 'Africa/Johannesburg',
+  secrets: [zohoAppPassword]
+}, async () => {
+  const { startUtc, endUtc, dateKey } = sastDayBoundsUtc();
+  const startTs = Timestamp.fromDate(startUtc);
+  const endTs = Timestamp.fromDate(endUtc);
+
+  // General tutoring: sessions scheduled for today.
+  const sessionsSnap = await db.collection('sessions')
+    .where('status', '==', 'scheduled')
+    .where('scheduledAt', '>=', startTs)
+    .where('scheduledAt', '<=', endTs)
+    .get();
+
+  await Promise.all(sessionsSnap.docs.map(async (docSnap) => {
+    const s = docSnap.data();
+    if (s.reminderSent) return;
+    await sendEmail({
+      to: s.studentEmail,
+      subject: `Reminder: ${s.subject} today`,
+      html: `
+        <p>Hi,</p>
+        <p>Just a reminder — you have a ${s.subject} session today at ${s.scheduledAt.toDate().toLocaleTimeString('en-ZA', { hour: '2-digit', minute: '2-digit', timeZone: 'Africa/Johannesburg' })}.</p>
+        ${s.meetingLink ? `<p><a href="${s.meetingLink}">Join session</a></p>` : ''}
+      `
+    });
+    await docSnap.ref.update({ reminderSent: true });
+  }));
+
+  // Second Chance: recurring class slots whose weekly day matches today.
+  const dayOfWeek = sastNow().getUTCDay();
+  const groupsSnap = await db.collection('matricGroups').where('dayOfWeek', '==', dayOfWeek).get();
+
+  await Promise.all(groupsSnap.docs.map(async (groupDoc) => {
+    const g = groupDoc.data();
+    const reminderRef = db.doc(`matricGroupReminders/${groupDoc.id}_${dateKey}`);
+    const reminderSnap = await reminderRef.get();
+    if (reminderSnap.exists) return;
+
+    const studentIds = g.studentIds || [];
+    await Promise.all(studentIds.map(async (studentId) => {
+      const studentDoc = await db.doc(`matricStudents/${studentId}`).get();
+      if (!studentDoc.exists) return;
+      await sendEmail({
+        to: studentDoc.data().email,
+        subject: `Reminder: ${g.subject} today`,
+        html: `
+          <p>Hi,</p>
+          <p>Just a reminder — you have ${g.subject} today from ${g.startTime} to ${g.endTime} with ${g.tutorName}.</p>
+          ${g.meetingLink ? `<p><a href="${g.meetingLink}">Join session</a></p>` : ''}
+        `
+      });
+    }));
+
+    await reminderRef.set({ sentAt: FieldValue.serverTimestamp() });
+  }));
 });
