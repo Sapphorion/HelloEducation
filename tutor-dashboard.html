@@ -114,6 +114,35 @@
         <ul id="questionsList"><li>Loading…</li></ul>
       </div>
 
+      <div class="dashboard-card">
+        <h3>My matric classes</h3>
+        <p class="card-hint">Your fixed weekly class slots for the matric re-write programme.</p>
+        <ul id="matricGroupsList"><li>Loading…</li></ul>
+      </div>
+
+      <div class="dashboard-grid dashboard-grid-2">
+        <div class="dashboard-card">
+          <h3>Give a matric task/assessment</h3>
+          <p class="card-hint">Assigns to every student in the chosen class slot.</p>
+          <form id="matricAssignForm" class="admin-form">
+            <select id="matricAssignGroup" required><option value="">Choose a class slot…</option></select>
+            <input id="matricAssignTitle" type="text" placeholder="Title" required />
+            <textarea id="matricAssignDescription" placeholder="Instructions (optional)" rows="2"></textarea>
+            <select id="matricAssignType" required>
+              <option value="task">Task</option>
+              <option value="assessment">Assessment</option>
+            </select>
+            <input id="matricAssignDue" type="datetime-local" required />
+            <button type="submit">Assign</button>
+          </form>
+          <p class="auth-feedback" id="matricAssignFeedback"></p>
+        </div>
+        <div class="dashboard-card">
+          <h3>Matric tasks/assessments I've given</h3>
+          <ul id="matricAssignmentsList"><li>Loading…</li></ul>
+        </div>
+      </div>
+
       <button id="signOutBtn" type="button">Sign Out</button>
     </section>
   </main>
@@ -125,7 +154,7 @@
   <script type="module">
     import { initializeApp } from 'https://www.gstatic.com/firebasejs/12.4.0/firebase-app.js';
     import { getAuth, onAuthStateChanged, signOut } from 'https://www.gstatic.com/firebasejs/12.4.0/firebase-auth.js';
-    import { getFirestore, collection, query, where, orderBy, getDocs, addDoc, deleteDoc, updateDoc, doc, Timestamp, serverTimestamp } from 'https://www.gstatic.com/firebasejs/12.4.0/firebase-firestore.js';
+    import { getFirestore, collection, query, where, orderBy, getDocs, getDoc, addDoc, deleteDoc, updateDoc, doc, Timestamp, serverTimestamp, writeBatch } from 'https://www.gstatic.com/firebasejs/12.4.0/firebase-firestore.js';
     import { firebaseConfig, isFirebaseConfigured } from './firebase-config.js';
 
     const DAY_NAMES = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
@@ -161,6 +190,11 @@
     const assignFeedback = document.getElementById('assignFeedback');
     const assignmentsList = document.getElementById('assignmentsList');
     const questionsList = document.getElementById('questionsList');
+    const matricGroupsList = document.getElementById('matricGroupsList');
+    const matricAssignForm = document.getElementById('matricAssignForm');
+    const matricAssignGroup = document.getElementById('matricAssignGroup');
+    const matricAssignFeedback = document.getElementById('matricAssignFeedback');
+    const matricAssignmentsList = document.getElementById('matricAssignmentsList');
     const signOutBtn = document.getElementById('signOutBtn');
 
     async function renderQuestions() {
@@ -203,6 +237,99 @@
       });
       await renderQuestions();
     });
+
+    let allMyMatricGroups = [];
+    let matricStudentById = {};
+
+    async function renderMyMatricGroups() {
+      if (!auth.currentUser) return;
+      const groupsQuery = query(collection(db, 'matricGroups'), where('tutorId', '==', auth.currentUser.uid));
+      const snapshot = await getDocs(groupsQuery);
+      allMyMatricGroups = snapshot.docs
+        .map((docSnap) => ({ id: docSnap.id, ...docSnap.data() }))
+        .sort((a, b) => a.dayOfWeek - b.dayOfWeek || a.startTime.localeCompare(b.startTime));
+
+      const studentIds = [...new Set(allMyMatricGroups.flatMap((g) => g.studentIds || []))];
+      matricStudentById = {};
+      await Promise.all(studentIds.map(async (uid) => {
+        const snap = await getDoc(doc(db, 'matricStudents', uid));
+        if (snap.exists()) matricStudentById[uid] = snap.data();
+      }));
+
+      matricGroupsList.innerHTML = allMyMatricGroups.length
+        ? allMyMatricGroups.map((g) => {
+          const roster = (g.studentIds || []).map((uid) => matricStudentById[uid]?.email || uid).join(', ') || 'No students enrolled yet';
+          return `<li><strong>${g.subject}</strong> — ${DAY_NAMES[g.dayOfWeek]} ${g.startTime}–${g.endTime} <span class="status-badge">${(g.studentIds || []).length}/${g.capacity || 4}</span>${g.meetingLink ? ` — <a href="${g.meetingLink}" target="_blank" rel="noopener">Join session</a>` : ''}<br>${roster}</li>`;
+        }).join('')
+        : '<li>No matric class slots assigned to you yet.</li>';
+
+      matricAssignGroup.innerHTML = '<option value="">Choose a class slot…</option>' + allMyMatricGroups
+        .map((g) => `<option value="${g.id}">${g.subject} — ${DAY_NAMES[g.dayOfWeek]} ${g.startTime}–${g.endTime}</option>`)
+        .join('');
+    }
+
+    matricAssignForm.addEventListener('submit', async (event) => {
+      event.preventDefault();
+      matricAssignFeedback.textContent = 'Assigning…';
+
+      const groupId = matricAssignGroup.value;
+      const group = allMyMatricGroups.find((g) => g.id === groupId);
+      const title = document.getElementById('matricAssignTitle').value.trim();
+      const description = document.getElementById('matricAssignDescription').value.trim();
+      const type = document.getElementById('matricAssignType').value;
+      const dueValue = document.getElementById('matricAssignDue').value;
+
+      if (!group || !group.studentIds || !group.studentIds.length) {
+        matricAssignFeedback.textContent = 'That class slot has no students enrolled yet.';
+        return;
+      }
+
+      const batch = writeBatch(db);
+      group.studentIds.forEach((studentId) => {
+        const student = matricStudentById[studentId];
+        batch.set(doc(collection(db, 'matricAssignments')), {
+          groupId,
+          subject: group.subject,
+          studentId,
+          studentEmail: student ? student.email : '',
+          title,
+          description,
+          type,
+          dueAt: Timestamp.fromDate(new Date(dueValue)),
+          status: 'assigned',
+          submissionNote: '',
+          fileUrl: null,
+          fileName: null,
+          feedback: '',
+          createdBy: auth.currentUser.uid,
+          createdAt: serverTimestamp()
+        });
+      });
+      await batch.commit();
+
+      matricAssignFeedback.textContent = `Assigned to ${group.studentIds.length} student(s).`;
+      matricAssignForm.reset();
+      await renderMyMatricAssignments();
+    });
+
+    async function renderMyMatricAssignments() {
+      if (!auth.currentUser) return;
+      const assignmentsQuery = query(collection(db, 'matricAssignments'), where('createdBy', '==', auth.currentUser.uid));
+      const snapshot = await getDocs(assignmentsQuery);
+      const assignments = snapshot.docs
+        .map((docSnap) => ({ id: docSnap.id, ...docSnap.data() }))
+        .sort((a, b) => (b.createdAt?.toMillis() || 0) - (a.createdAt?.toMillis() || 0));
+
+      matricAssignmentsList.innerHTML = assignments.length
+        ? assignments.map((a) => `
+          <li>
+            <strong>${a.title}</strong> — ${a.studentEmail || 'Student'} <span class="status-badge">${a.type}</span> <span class="status-badge">${a.status}</span>
+            ${a.dueAt ? `<br>Due: ${a.dueAt.toDate().toLocaleString()}` : ''}
+            ${a.status !== 'assigned' ? `<br>Submission: ${a.submissionNote || '(no note)'}${a.fileUrl ? ` — <a href="${a.fileUrl}" target="_blank" rel="noopener">${a.fileName}</a>` : ''}` : ''}
+          </li>
+        `).join('')
+        : '<li>No matric tasks/assessments given yet.</li>';
+    }
 
     let allMyAssignments = [];
 
@@ -465,6 +592,8 @@
       renderAvailability();
       renderAssignments();
       renderQuestions();
+      renderMyMatricGroups();
+      renderMyMatricAssignments();
     });
 
     signOutBtn.addEventListener('click', async () => {

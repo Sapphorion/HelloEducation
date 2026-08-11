@@ -64,6 +64,7 @@
               <option value="student">Student</option>
               <option value="tutor">Tutor</option>
               <option value="parent">Parent</option>
+              <option value="matricStudent">Matric Student</option>
               <option value="admin">Admin</option>
             </select>
             <input id="newAccountName" type="text" placeholder="Name" required />
@@ -104,6 +105,74 @@
       </div>
 
       <div class="dashboard-card">
+        <h3>Matric Re-write Programme</h3>
+        <p class="card-hint">Fixed-timetable online schooling for matric re-write students, separate from general tutoring. Groups of up to 4 students share a weekly class slot (Monday–Thursday, 9am–3pm) per subject.</p>
+
+        <div class="dashboard-grid dashboard-grid-2">
+          <div class="dashboard-card">
+            <h3>Subjects</h3>
+            <form id="matricSubjectForm" class="admin-form">
+              <input id="matricSubjectName" type="text" placeholder="Subject name (e.g. Mathematics)" required />
+              <button type="submit">Add subject</button>
+            </form>
+            <ul id="matricSubjectsList"><li>Loading…</li></ul>
+          </div>
+          <div class="dashboard-card">
+            <h3>Create a class slot</h3>
+            <p class="card-hint">Capacity is fixed at 4 students per slot. A video call link is generated automatically.</p>
+            <form id="matricGroupForm" class="admin-form">
+              <select id="matricGroupSubject" required><option value="">Choose a subject…</option></select>
+              <select id="matricGroupDay" required>
+                <option value="1">Monday</option>
+                <option value="2">Tuesday</option>
+                <option value="3">Wednesday</option>
+                <option value="4">Thursday</option>
+              </select>
+              <input id="matricGroupStart" type="time" min="09:00" max="15:00" required />
+              <input id="matricGroupEnd" type="time" min="09:00" max="15:00" required />
+              <select id="matricGroupTutor" required><option value="">Choose a tutor…</option></select>
+              <button type="submit">Create slot</button>
+            </form>
+            <p class="auth-feedback" id="matricGroupFeedback"></p>
+          </div>
+        </div>
+
+        <div class="dashboard-card">
+          <h3>Class slots &amp; rosters</h3>
+          <ul id="matricGroupsList"><li>Loading…</li></ul>
+        </div>
+
+        <div class="dashboard-grid dashboard-grid-2">
+          <div class="dashboard-card">
+            <h3>Enrol a student in a subject</h3>
+            <p class="card-hint">Auto-assigns them into an open class slot for that subject.</p>
+            <form id="matricEnrollForm" class="admin-form">
+              <select id="matricEnrollStudent" required><option value="">Choose a matric student…</option></select>
+              <select id="matricEnrollSubject" required><option value="">Choose a subject…</option></select>
+              <button type="submit">Enrol</button>
+            </form>
+            <p class="auth-feedback" id="matricEnrollFeedback"></p>
+          </div>
+          <div class="dashboard-card">
+            <h3>Give a task/assessment</h3>
+            <p class="card-hint">Assigns to every student in the chosen class slot.</p>
+            <form id="matricAssignForm" class="admin-form">
+              <select id="matricAssignGroup" required><option value="">Choose a class slot…</option></select>
+              <input id="matricAssignTitle" type="text" placeholder="Title" required />
+              <textarea id="matricAssignDescription" placeholder="Instructions (optional)" rows="2"></textarea>
+              <select id="matricAssignType" required>
+                <option value="task">Task</option>
+                <option value="assessment">Assessment</option>
+              </select>
+              <input id="matricAssignDue" type="datetime-local" required />
+              <button type="submit">Assign</button>
+            </form>
+            <p class="auth-feedback" id="matricAssignFeedback"></p>
+          </div>
+        </div>
+      </div>
+
+      <div class="dashboard-card">
         <h3>Current tutors</h3>
         <ul id="tutorDirectory"><li>Loading…</li></ul>
       </div>
@@ -118,6 +187,7 @@
             <option value="student">Student</option>
             <option value="tutor">Tutor</option>
             <option value="parent">Parent</option>
+            <option value="matricStudent">Matric Student</option>
             <option value="admin">Admin</option>
           </select>
           <label class="accounts-filter-checkbox">
@@ -139,7 +209,7 @@
   <script type="module">
     import { initializeApp } from 'https://www.gstatic.com/firebasejs/12.4.0/firebase-app.js';
     import { getAuth, onAuthStateChanged, signOut } from 'https://www.gstatic.com/firebasejs/12.4.0/firebase-auth.js';
-    import { getFirestore, collection, query, where, getDocs, updateDoc, doc, deleteDoc, addDoc, serverTimestamp } from 'https://www.gstatic.com/firebasejs/12.4.0/firebase-firestore.js';
+    import { getFirestore, collection, query, where, getDocs, updateDoc, doc, deleteDoc, addDoc, serverTimestamp, writeBatch, Timestamp } from 'https://www.gstatic.com/firebasejs/12.4.0/firebase-firestore.js';
     import { getFunctions, httpsCallable } from 'https://www.gstatic.com/firebasejs/12.4.0/firebase-functions.js';
     import { firebaseConfig, isFirebaseConfigured } from './firebase-config.js';
 
@@ -155,6 +225,13 @@
     const createAccountCallable = httpsCallable(functions, 'createAccount');
     const setAccountDisabledCallable = httpsCallable(functions, 'setAccountDisabled');
     const deleteAccountCallable = httpsCallable(functions, 'deleteAccount');
+    const enrollMatricStudentCallable = httpsCallable(functions, 'enrollMatricStudent');
+    const DAY_NAMES = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+
+    function generateMeetingLink() {
+      const slug = crypto.randomUUID().replace(/-/g, '').slice(0, 16);
+      return `https://meet.jit.si/HelloEducation-${slug}`;
+    }
     const welcomeMessage = document.getElementById('welcomeMessage');
     const summaryText = document.getElementById('summaryText');
     const signOutBtn = document.getElementById('signOutBtn');
@@ -174,7 +251,21 @@
     const inactiveTutorsList = document.getElementById('inactiveTutorsList');
     const adminAssignForm = document.getElementById('adminAssignForm');
     const adminAssignFeedback = document.getElementById('adminAssignFeedback');
-    const ROLE_ORDER = ['admin', 'tutor', 'parent', 'student'];
+    const matricSubjectForm = document.getElementById('matricSubjectForm');
+    const matricSubjectsList = document.getElementById('matricSubjectsList');
+    const matricGroupForm = document.getElementById('matricGroupForm');
+    const matricGroupSubject = document.getElementById('matricGroupSubject');
+    const matricGroupTutor = document.getElementById('matricGroupTutor');
+    const matricGroupFeedback = document.getElementById('matricGroupFeedback');
+    const matricGroupsList = document.getElementById('matricGroupsList');
+    const matricEnrollForm = document.getElementById('matricEnrollForm');
+    const matricEnrollStudent = document.getElementById('matricEnrollStudent');
+    const matricEnrollSubject = document.getElementById('matricEnrollSubject');
+    const matricEnrollFeedback = document.getElementById('matricEnrollFeedback');
+    const matricAssignForm = document.getElementById('matricAssignForm');
+    const matricAssignGroup = document.getElementById('matricAssignGroup');
+    const matricAssignFeedback = document.getElementById('matricAssignFeedback');
+    const ROLE_ORDER = ['admin', 'tutor', 'parent', 'student', 'matricStudent'];
 
     adminAssignForm.addEventListener('submit', async (event) => {
       event.preventDefault();
@@ -262,13 +353,14 @@
       const sessions = sessionsSnap.docs.map((d) => d.data());
       const tutors = tutorsSnap.docs.map((d) => ({ id: d.id, ...d.data() }));
 
-      const roleCounts = { student: 0, tutor: 0, parent: 0, admin: 0 };
+      const roleCounts = { student: 0, tutor: 0, parent: 0, admin: 0, matricStudent: 0 };
       users.forEach((u) => { if (roleCounts[u.role] !== undefined) roleCounts[u.role]++; });
 
       roleStatTiles.innerHTML = `
         <div class="stat-tile"><span class="stat-value">${roleCounts.student}</span><span class="stat-label">Students</span></div>
         <div class="stat-tile"><span class="stat-value">${roleCounts.tutor}</span><span class="stat-label">Tutors</span></div>
         <div class="stat-tile"><span class="stat-value">${roleCounts.parent}</span><span class="stat-label">Parents</span></div>
+        <div class="stat-tile"><span class="stat-value">${roleCounts.matricStudent}</span><span class="stat-label">Matric students</span></div>
         <div class="stat-tile"><span class="stat-value">${roleCounts.admin}</span><span class="stat-label">Admins</span></div>
       `;
 
@@ -328,6 +420,208 @@
       }).join('');
     }
 
+    let allMatricSubjects = [];
+    let allMatricGroups = [];
+    let matricStudentById = {};
+
+    async function renderMatricSubjects() {
+      const snapshot = await getDocs(collection(db, 'matricSubjects'));
+      allMatricSubjects = snapshot.docs
+        .map((docSnap) => ({ id: docSnap.id, ...docSnap.data() }))
+        .sort((a, b) => a.name.localeCompare(b.name));
+
+      matricSubjectsList.innerHTML = allMatricSubjects.length
+        ? allMatricSubjects.map((s) => `
+          <li>
+            <span>${s.name}</span>
+            <button class="action-btn secondary" data-subject-id="${s.id}" type="button">Remove</button>
+          </li>
+        `).join('')
+        : '<li>No subjects yet — add the NSC subjects your matric re-write students need.</li>';
+
+      const subjectOptions = allMatricSubjects.map((s) => `<option value="${s.name}">${s.name}</option>`).join('');
+      matricGroupSubject.innerHTML = '<option value="">Choose a subject…</option>' + subjectOptions;
+      matricEnrollSubject.innerHTML = '<option value="">Choose a subject…</option>' + subjectOptions;
+    }
+
+    matricSubjectForm.addEventListener('submit', async (event) => {
+      event.preventDefault();
+      const name = document.getElementById('matricSubjectName').value.trim();
+      if (!name) return;
+      await addDoc(collection(db, 'matricSubjects'), { name, createdAt: serverTimestamp() });
+      matricSubjectForm.reset();
+      await renderMatricSubjects();
+    });
+
+    matricSubjectsList.addEventListener('click', async (event) => {
+      const button = event.target.closest('button[data-subject-id]');
+      if (!button) return;
+      await deleteDoc(doc(db, 'matricSubjects', button.dataset.subjectId));
+      await renderMatricSubjects();
+    });
+
+    async function renderMatricTutorSelect() {
+      const snapshot = await getDocs(collection(db, 'tutors'));
+      matricGroupTutor.innerHTML = '<option value="">Choose a tutor…</option>' + snapshot.docs
+        .map((docSnap) => `<option value="${docSnap.id}" data-name="${docSnap.data().name}">${docSnap.data().name} — ${docSnap.data().subject}</option>`)
+        .join('');
+    }
+
+    async function renderMatricStudentsSelect() {
+      const snapshot = await getDocs(collection(db, 'matricStudents'));
+      matricStudentById = Object.fromEntries(snapshot.docs.map((d) => [d.id, d.data()]));
+      matricEnrollStudent.innerHTML = '<option value="">Choose a matric student…</option>' + snapshot.docs
+        .map((docSnap) => `<option value="${docSnap.id}">${docSnap.data().name} — ${docSnap.data().email}</option>`)
+        .join('');
+    }
+
+    async function renderMatricGroups() {
+      const snapshot = await getDocs(collection(db, 'matricGroups'));
+      allMatricGroups = snapshot.docs
+        .map((docSnap) => ({ id: docSnap.id, ...docSnap.data() }))
+        .sort((a, b) => a.dayOfWeek - b.dayOfWeek || a.startTime.localeCompare(b.startTime));
+
+      matricGroupsList.innerHTML = allMatricGroups.length
+        ? allMatricGroups.map((g) => {
+          const roster = (g.studentIds || []).map((uid) => {
+            const student = matricStudentById[uid];
+            const label = student ? `${student.name} (${student.email})` : uid;
+            return `<li>${label} <button class="action-btn secondary" data-remove-student="${uid}" data-group-id="${g.id}" type="button">Remove</button></li>`;
+          }).join('');
+          return `
+            <li>
+              <div>
+                <strong>${g.subject}</strong> — ${DAY_NAMES[g.dayOfWeek]} ${g.startTime}–${g.endTime} — Tutor: ${g.tutorName}
+                <span class="status-badge">${(g.studentIds || []).length}/${g.capacity || 4}</span>
+                ${g.meetingLink ? ` — <a href="${g.meetingLink}" target="_blank" rel="noopener">Join session</a>` : ''}
+                <button class="action-btn secondary" data-delete-group="${g.id}" type="button">Delete slot</button>
+              </div>
+              <ul class="dashboard-card" style="margin-top:0.5rem;">${roster || '<li>No students enrolled yet.</li>'}</ul>
+            </li>
+          `;
+        }).join('')
+        : '<li>No class slots yet — create one above.</li>';
+
+      matricAssignGroup.innerHTML = '<option value="">Choose a class slot…</option>' + allMatricGroups
+        .map((g) => `<option value="${g.id}">${g.subject} — ${DAY_NAMES[g.dayOfWeek]} ${g.startTime}–${g.endTime} (${(g.studentIds || []).length}/${g.capacity || 4})</option>`)
+        .join('');
+    }
+
+    matricGroupForm.addEventListener('submit', async (event) => {
+      event.preventDefault();
+      matricGroupFeedback.textContent = 'Creating…';
+
+      const subject = matricGroupSubject.value;
+      const dayOfWeek = Number(document.getElementById('matricGroupDay').value);
+      const startTime = document.getElementById('matricGroupStart').value;
+      const endTime = document.getElementById('matricGroupEnd').value;
+      const tutorId = matricGroupTutor.value;
+      const tutorName = matricGroupTutor.options[matricGroupTutor.selectedIndex]?.dataset.name || '';
+
+      if (startTime < '09:00' || endTime > '15:00' || startTime >= endTime) {
+        matricGroupFeedback.textContent = 'Class slots must fall between 9am and 3pm, with a start time before the end time.';
+        return;
+      }
+
+      await addDoc(collection(db, 'matricGroups'), {
+        subject,
+        dayOfWeek,
+        startTime,
+        endTime,
+        tutorId,
+        tutorName,
+        capacity: 4,
+        studentIds: [],
+        meetingLink: generateMeetingLink(),
+        createdAt: serverTimestamp()
+      });
+
+      matricGroupFeedback.textContent = 'Class slot created.';
+      matricGroupForm.reset();
+      await renderMatricGroups();
+    });
+
+    matricGroupsList.addEventListener('click', async (event) => {
+      const deleteBtn = event.target.closest('button[data-delete-group]');
+      if (deleteBtn) {
+        if (!confirm('Delete this class slot? This can\'t be undone.')) return;
+        await deleteDoc(doc(db, 'matricGroups', deleteBtn.dataset.deleteGroup));
+        await renderMatricGroups();
+        return;
+      }
+
+      const removeBtn = event.target.closest('button[data-remove-student]');
+      if (removeBtn) {
+        const group = allMatricGroups.find((g) => g.id === removeBtn.dataset.groupId);
+        await updateDoc(doc(db, 'matricGroups', removeBtn.dataset.groupId), {
+          studentIds: (group.studentIds || []).filter((uid) => uid !== removeBtn.dataset.removeStudent)
+        });
+        await renderMatricGroups();
+      }
+    });
+
+    matricEnrollForm.addEventListener('submit', async (event) => {
+      event.preventDefault();
+      matricEnrollFeedback.textContent = 'Enrolling…';
+
+      const studentId = matricEnrollStudent.value;
+      const subject = matricEnrollSubject.value;
+
+      try {
+        const response = await enrollMatricStudentCallable({ studentId, subject });
+        matricEnrollFeedback.textContent = response.data.alreadyEnrolled
+          ? 'Already enrolled in a class slot for this subject.'
+          : `Enrolled — ${DAY_NAMES[response.data.dayOfWeek]} ${response.data.startTime}–${response.data.endTime} with ${response.data.tutorName}.`;
+        matricEnrollForm.reset();
+        await renderMatricGroups();
+      } catch (error) {
+        matricEnrollFeedback.textContent = error.message || 'Could not enrol this student.';
+      }
+    });
+
+    matricAssignForm.addEventListener('submit', async (event) => {
+      event.preventDefault();
+      matricAssignFeedback.textContent = 'Assigning…';
+
+      const groupId = matricAssignGroup.value;
+      const group = allMatricGroups.find((g) => g.id === groupId);
+      const title = document.getElementById('matricAssignTitle').value.trim();
+      const description = document.getElementById('matricAssignDescription').value.trim();
+      const type = document.getElementById('matricAssignType').value;
+      const dueValue = document.getElementById('matricAssignDue').value;
+
+      if (!group || !group.studentIds || !group.studentIds.length) {
+        matricAssignFeedback.textContent = 'That class slot has no students enrolled yet.';
+        return;
+      }
+
+      const batch = writeBatch(db);
+      group.studentIds.forEach((studentId) => {
+        const student = matricStudentById[studentId];
+        batch.set(doc(collection(db, 'matricAssignments')), {
+          groupId,
+          subject: group.subject,
+          studentId,
+          studentEmail: student ? student.email : '',
+          title,
+          description,
+          type,
+          dueAt: Timestamp.fromDate(new Date(dueValue)),
+          status: 'assigned',
+          submissionNote: '',
+          fileUrl: null,
+          fileName: null,
+          feedback: '',
+          createdBy: auth.currentUser.uid,
+          createdAt: serverTimestamp()
+        });
+      });
+      await batch.commit();
+
+      matricAssignFeedback.textContent = `Assigned to ${group.studentIds.length} student(s).`;
+      matricAssignForm.reset();
+    });
+
     let allAccounts = [];
 
     async function renderAccountsDirectory() {
@@ -363,7 +657,7 @@
       accountsDirectory.innerHTML = accounts.map((account) => {
         const isSelf = account.id === currentUid;
         const disabledBadge = account.disabled ? ' <span class="status-badge" style="background:#fee2e2;color:#b91c1c;">disabled</span>' : '';
-        const roleOptions = ['student', 'tutor', 'parent', 'admin']
+        const roleOptions = ['student', 'tutor', 'parent', 'matricStudent', 'admin']
           .map((r) => `<option value="${r}" ${r === account.role ? 'selected' : ''}>${r}</option>`)
           .join('');
 
@@ -450,6 +744,7 @@
           <button class="action-btn" data-role="student" type="button">Set student</button>
           <button class="action-btn" data-role="tutor" type="button">Set tutor</button>
           <button class="action-btn" data-role="parent" type="button">Set parent</button>
+          <button class="action-btn" data-role="matricStudent" type="button">Set matric student</button>
           <button class="action-btn" data-role="admin" type="button">Set admin</button>
         </div>
         ${currentData.role === 'parent' ? `
@@ -524,6 +819,10 @@
         updateRoleFields();
         if (role === 'tutor') {
           await renderTutorDirectory();
+          await renderMatricTutorSelect();
+        }
+        if (role === 'matricStudent') {
+          await renderMatricStudentsSelect();
         }
         await renderAccountsDirectory();
         await renderReporting();
@@ -556,6 +855,9 @@
       renderTutorDirectory();
       renderAccountsDirectory();
       renderReporting();
+      renderMatricSubjects();
+      renderMatricTutorSelect();
+      renderMatricStudentsSelect().then(renderMatricGroups);
     });
 
     signOutBtn.addEventListener('click', async () => {

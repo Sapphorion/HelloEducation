@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>HelloEducation Matric Re-write Dashboard</title>
+  <link rel="stylesheet" href="styling.css" />
+</head>
+<body>
+  <header>
+    <h1>HelloEducation</h1>
+    <h1 class="page-heading">Matric Re-write Dashboard</h1>
+  </header>
+
+  <navigation>
+    <ul>
+      <li><a href="index.html">Home</a></li>
+      <li><a href="services.html">Services</a></li>
+      <li><a href="tutors.html">Tutors</a></li>
+      <li><a href="contact.html">Contact</a></li>
+    </ul>
+  </navigation>
+
+  <main class="auth-page">
+    <section class="auth-panel dashboard-panel">
+      <h2 id="welcomeMessage">Welcome back</h2>
+      <p id="summaryText">Loading your dashboard…</p>
+
+      <div class="dashboard-card">
+        <h3>My weekly timetable</h3>
+        <p class="card-hint">Your fixed class slots, Monday–Thursday, 9am–3pm. The same video link is used every week.</p>
+        <ul id="timetableList"><li>Loading…</li></ul>
+      </div>
+
+      <div class="dashboard-card">
+        <h3>Tasks &amp; assessments</h3>
+        <ul id="taskList"><li>Loading…</li></ul>
+      </div>
+
+      <button id="signOutBtn" type="button">Sign Out</button>
+    </section>
+  </main>
+
+  <footer>
+    <p>&copy; 2023 HelloEducation. All rights reserved.</p>
+  </footer>
+
+  <script type="module">
+    import { initializeApp } from 'https://www.gstatic.com/firebasejs/12.4.0/firebase-app.js';
+    import { getAuth, onAuthStateChanged, signOut } from 'https://www.gstatic.com/firebasejs/12.4.0/firebase-auth.js';
+    import { getFirestore, collection, query, where, getDocs, updateDoc, doc, serverTimestamp } from 'https://www.gstatic.com/firebasejs/12.4.0/firebase-firestore.js';
+    import { getStorage, ref, uploadBytes, getDownloadURL } from 'https://www.gstatic.com/firebasejs/12.4.0/firebase-storage.js';
+    import { firebaseConfig, isFirebaseConfigured } from './firebase-config.js';
+
+    const DAY_NAMES = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+
+    const role = localStorage.getItem('helloEducationRole');
+    if (role !== 'matricStudent') {
+      window.location.href = 'login.html?role=matricStudent';
+    }
+
+    const app = initializeApp(firebaseConfig);
+    const auth = getAuth(app);
+    const db = getFirestore(app);
+    const storage = getStorage(app);
+    const welcomeMessage = document.getElementById('welcomeMessage');
+    const summaryText = document.getElementById('summaryText');
+    const timetableList = document.getElementById('timetableList');
+    const taskList = document.getElementById('taskList');
+    const signOutBtn = document.getElementById('signOutBtn');
+
+    async function renderTimetable() {
+      if (!auth.currentUser) return;
+      const groupsQuery = query(collection(db, 'matricGroups'), where('studentIds', 'array-contains', auth.currentUser.uid));
+      const snapshot = await getDocs(groupsQuery);
+      const groups = snapshot.docs
+        .map((docSnap) => docSnap.data())
+        .sort((a, b) => a.dayOfWeek - b.dayOfWeek || a.startTime.localeCompare(b.startTime));
+
+      timetableList.innerHTML = groups.length
+        ? groups.map((g) => `<li><strong>${g.subject}</strong> — ${DAY_NAMES[g.dayOfWeek]} ${g.startTime}–${g.endTime} — ${g.tutorName}${g.meetingLink ? ` — <a href="${g.meetingLink}" target="_blank" rel="noopener">Join session</a>` : ''}</li>`).join('')
+        : '<li>Not enrolled in any classes yet — contact the HelloEducation admin.</li>';
+    }
+
+    async function renderTasks() {
+      if (!auth.currentUser) return;
+      const assignmentsQuery = query(collection(db, 'matricAssignments'), where('studentId', '==', auth.currentUser.uid));
+      const snapshot = await getDocs(assignmentsQuery);
+      const assignments = snapshot.docs
+        .map((docSnap) => ({ id: docSnap.id, ...docSnap.data() }))
+        .sort((a, b) => (a.dueAt?.toMillis() || 0) - (b.dueAt?.toMillis() || 0));
+
+      taskList.innerHTML = assignments.length
+        ? assignments.map((a) => `
+          <li>
+            <div>
+              <strong>${a.title}</strong> <span class="status-badge">${a.type}</span> <span class="status-badge">${a.status}</span>
+              ${a.subject ? `<br>${a.subject}` : ''}
+              ${a.dueAt ? `<br>Due: ${a.dueAt.toDate().toLocaleString()}` : ''}
+              ${a.description ? `<br>${a.description}` : ''}
+              ${a.status !== 'assigned' ? `<br>Your submission: ${a.submissionNote || '(no note)'}${a.fileUrl ? ` — <a href="${a.fileUrl}" target="_blank" rel="noopener">${a.fileName}</a>` : ''}` : ''}
+              ${a.feedback ? `<br>Tutor feedback: ${a.feedback}` : ''}
+            </div>
+            ${a.status === 'assigned' ? `
+              <form class="admin-form" data-submit-assignment="${a.id}">
+                <input type="text" placeholder="Note (optional)" data-note-input />
+                <input type="file" data-file-input />
+                <button type="submit">Submit</button>
+              </form>
+            ` : ''}
+          </li>
+        `).join('')
+        : '<li>Nothing assigned yet.</li>';
+    }
+
+    taskList.addEventListener('submit', async (event) => {
+      const form = event.target.closest('form[data-submit-assignment]');
+      if (!form) return;
+      event.preventDefault();
+
+      const assignmentId = form.dataset.submitAssignment;
+      const note = form.querySelector('[data-note-input]').value.trim();
+      const file = form.querySelector('[data-file-input]').files[0];
+      const submitBtn = form.querySelector('button[type="submit"]');
+      submitBtn.disabled = true;
+      submitBtn.textContent = 'Submitting…';
+
+      try {
+        let fileUrl = null;
+        let fileName = null;
+
+        if (file) {
+          const fileRef = ref(storage, `matric-assignment-submissions/${auth.currentUser.uid}/${assignmentId}/${file.name}`);
+          await uploadBytes(fileRef, file);
+          fileUrl = await getDownloadURL(fileRef);
+          fileName = file.name;
+        }
+
+        await updateDoc(doc(db, 'matricAssignments', assignmentId), {
+          submissionNote: note,
+          fileUrl,
+          fileName,
+          status: 'submitted',
+          submittedAt: serverTimestamp()
+        });
+
+        await renderTasks();
+      } catch (error) {
+        alert(error.message || 'Could not submit this assignment.');
+        submitBtn.disabled = false;
+        submitBtn.textContent = 'Submit';
+      }
+    });
+
+    onAuthStateChanged(auth, (user) => {
+      if (!user && !isFirebaseConfigured()) {
+        welcomeMessage.textContent = `Welcome back, ${localStorage.getItem('helloEducationUser') || 'student'}!`;
+        summaryText.textContent = 'Demo mode is active.';
+        return;
+      }
+
+      if (!user) {
+        window.location.href = 'login.html?role=matricStudent';
+        return;
+      }
+
+      welcomeMessage.textContent = `Welcome back, ${user.email || 'student'}!`;
+      summaryText.textContent = 'Here\'s your matric re-write timetable and workload.';
+      renderTimetable();
+      renderTasks();
+    });
+
+    signOutBtn.addEventListener('click', async () => {
+      if (!isFirebaseConfigured()) {
+        localStorage.removeItem('helloEducationRole');
+        localStorage.removeItem('helloEducationUser');
+        window.location.href = 'login.html?role=matricStudent';
+        return;
+      }
+
+      await signOut(auth);
+    });
+  </script>
+</body>
+</html>

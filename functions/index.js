@@ -14,7 +14,7 @@ const anthropicApiKey = defineSecret('ANTHROPIC_API_KEY');
 const db = getFirestore();
 const auth = getAuth();
 
-const VALID_ROLES = ['student', 'tutor', 'admin', 'parent'];
+const VALID_ROLES = ['student', 'tutor', 'admin', 'parent', 'matricStudent'];
 
 function generateTempPassword() {
   return Math.random().toString(36).slice(-6) + Math.random().toString(36).slice(-6).toUpperCase();
@@ -64,7 +64,7 @@ exports.createAccount = onCall(async (request) => {
     throw new HttpsError('invalid-argument', 'A name is required.');
   }
   if (!VALID_ROLES.includes(role)) {
-    throw new HttpsError('invalid-argument', 'Role must be student, tutor, parent, or admin.');
+    throw new HttpsError('invalid-argument', 'Role must be student, tutor, parent, matricStudent, or admin.');
   }
 
   let childUids = [];
@@ -137,6 +137,16 @@ exports.createAccount = onCall(async (request) => {
     });
   }
 
+  if (role === 'matricStudent') {
+    batch.set(db.doc(`matricStudents/${userRecord.uid}`), {
+      name,
+      email,
+      subjects: [],
+      status: 'active',
+      createdBy: callerUid
+    });
+  }
+
   await batch.commit();
 
   return {
@@ -202,6 +212,9 @@ exports.deleteAccount = onCall(async (request) => {
   if (role === 'student') {
     batch.delete(db.doc(`students/${uid}`));
   }
+  if (role === 'matricStudent') {
+    batch.delete(db.doc(`matricStudents/${uid}`));
+  }
   await batch.commit();
 
   if (role === 'student') {
@@ -211,6 +224,15 @@ exports.deleteAccount = onCall(async (request) => {
       .get();
     await Promise.all(parentsWithChild.docs.map((parentDoc) =>
       parentDoc.ref.update({ childUids: FieldValue.arrayRemove(uid) })
+    ));
+  }
+
+  if (role === 'matricStudent') {
+    const groupsWithStudent = await db.collection('matricGroups')
+      .where('studentIds', 'array-contains', uid)
+      .get();
+    await Promise.all(groupsWithStudent.docs.map((groupDoc) =>
+      groupDoc.ref.update({ studentIds: FieldValue.arrayRemove(uid) })
     ));
   }
 
@@ -273,6 +295,61 @@ exports.requestSession = onCall(async (request) => {
   });
 
   return { sessionId: sessionRef.id };
+});
+
+// Slots a matric re-write student into an open class group for a subject.
+// Server-side because it has to search across matricGroups for room and then
+// write two documents (the group roster and the student's subject list) —
+// admin-only and low-volume, so a plain read-then-write is enough (no
+// transaction) rather than the double-booking-style race guard requestSession
+// needs for student self-service.
+exports.enrollMatricStudent = onCall(async (request) => {
+  await requireAdmin(request.auth);
+  const { studentId, subject } = request.data || {};
+
+  if (!studentId || typeof studentId !== 'string') {
+    throw new HttpsError('invalid-argument', 'A matric student is required.');
+  }
+  if (!subject || typeof subject !== 'string' || !subject.trim()) {
+    throw new HttpsError('invalid-argument', 'A subject is required.');
+  }
+
+  const studentDoc = await db.doc(`matricStudents/${studentId}`).get();
+  if (!studentDoc.exists) {
+    throw new HttpsError('not-found', 'That matric student was not found.');
+  }
+
+  const groupsSnap = await db.collection('matricGroups').where('subject', '==', subject).get();
+
+  const alreadyIn = groupsSnap.docs.find((docSnap) => (docSnap.data().studentIds || []).includes(studentId));
+  if (alreadyIn) {
+    return { groupId: alreadyIn.id, alreadyEnrolled: true };
+  }
+
+  const openGroup = groupsSnap.docs.find((docSnap) => {
+    const data = docSnap.data();
+    return (data.studentIds || []).length < (data.capacity || 4);
+  });
+
+  if (!openGroup) {
+    throw new HttpsError(
+      'failed-precondition',
+      `No open class slot for ${subject} — create a new class slot for this subject first, then try again.`
+    );
+  }
+
+  await openGroup.ref.update({ studentIds: FieldValue.arrayUnion(studentId) });
+  await db.doc(`matricStudents/${studentId}`).update({ subjects: FieldValue.arrayUnion(subject) });
+
+  const groupData = openGroup.data();
+  return {
+    groupId: openGroup.id,
+    subject,
+    dayOfWeek: groupData.dayOfWeek,
+    startTime: groupData.startTime,
+    endTime: groupData.endTime,
+    tutorName: groupData.tutorName
+  };
 });
 
 const AI_SYSTEM_PROMPT = `You are a friendly, patient homework helper for HelloEducation, a tutoring service for school-age students. Help with any subject the student asks about: explain concepts clearly, work through problems step by step, and encourage understanding rather than just handing over final answers when it helps their learning.

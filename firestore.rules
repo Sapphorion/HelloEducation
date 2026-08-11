@@ -21,6 +21,10 @@ service cloud.firestore {
       return signedIn() && userRole(userId) == 'student';
     }
 
+    function isMatricStudent(userId) {
+      return signedIn() && userRole(userId) == 'matricStudent';
+    }
+
     // True if the signed-in user is a parent account linked to studentId via
     // its own childUids array. Only admins can set childUids (see the users
     // update rule below), so this link can't be self-granted.
@@ -147,6 +151,56 @@ service cloud.firestore {
       allow create: if signedIn() && isStudent(request.auth.uid) && request.resource.data.studentId == request.auth.uid;
       allow update: if signedIn() && (resource.data.tutorId == request.auth.uid || isAdmin(request.auth.uid));
       allow delete: if isAdmin(request.auth.uid) || resource.data.studentId == request.auth.uid;
+    }
+
+    // Matric re-write programme: a fully separate, fixed-timetable cohort
+    // (matricStudent role) from general tutoring. Profile doc mirrors
+    // students/{uid} but is admin-managed only — no self-serve create.
+    match /matricStudents/{studentId} {
+      allow read: if signedIn() && (request.auth.uid == studentId || isAdmin(request.auth.uid));
+      allow write: if isAdmin(request.auth.uid);
+    }
+
+    // Admin-editable controlled list of NSC subject names, used to populate
+    // the subject picker when creating class slots / enrolling students.
+    match /matricSubjects/{subjectId} {
+      allow read: if signedIn();
+      allow write: if isAdmin(request.auth.uid);
+    }
+
+    // A fixed weekly class slot (subject/day/time/tutor, capacity 4). Rosters
+    // are filled by the enrollMatricStudent Cloud Function via the Admin SDK
+    // (bypasses these rules) so the "find an open slot" search and the
+    // capacity check stay server-side — no client create/update path needed
+    // beyond admin managing slots directly.
+    match /matricGroups/{groupId} {
+      allow read: if signedIn() && (
+        isAdmin(request.auth.uid)
+        || resource.data.tutorId == request.auth.uid
+        || request.auth.uid in resource.data.studentIds
+      );
+      allow create, update, delete: if isAdmin(request.auth.uid);
+    }
+
+    // Tasks/assessments for the matric re-write programme. Same shape as
+    // assignments/{assignmentId} above, kept as a separate collection since
+    // matric students are a separate role.
+    match /matricAssignments/{assignmentId} {
+      allow read: if signedIn() && (
+        resource.data.studentId == request.auth.uid
+        || resource.data.createdBy == request.auth.uid
+        || isAdmin(request.auth.uid)
+      );
+      allow create: if signedIn() && (
+        isAdmin(request.auth.uid)
+        || (isTutor(request.auth.uid) && request.resource.data.createdBy == request.auth.uid)
+      );
+      allow update: if signedIn() && (
+        isAdmin(request.auth.uid)
+        || resource.data.createdBy == request.auth.uid
+        || resource.data.studentId == request.auth.uid
+      );
+      allow delete: if isAdmin(request.auth.uid) || resource.data.createdBy == request.auth.uid;
     }
 
     // AI homework-helper chat transcript. Written only by the askAI Cloud
