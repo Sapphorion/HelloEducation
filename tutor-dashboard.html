@@ -97,8 +97,30 @@
         </div>
       </div>
 
+      <div class="dashboard-grid dashboard-grid-2">
+        <div class="dashboard-card">
+          <h3>Create material with AI</h3>
+          <p class="card-hint">Describe what you need — the AI drafts a worksheet or slideshow you can view, print, or share a link to.</p>
+          <form id="materialForm" class="admin-form">
+            <select id="materialType" required>
+              <option value="worksheet">Worksheet</option>
+              <option value="slideshow">Slideshow</option>
+            </select>
+            <input id="materialSubject" type="text" placeholder="Subject (e.g. Grade 9 Maths)" />
+            <textarea id="materialTopic" placeholder="What should it cover? (e.g. 10 questions on solving linear equations, with an answer key)" rows="3" required></textarea>
+            <button type="submit">Generate</button>
+          </form>
+          <p class="auth-feedback" id="materialFeedback"></p>
+        </div>
+        <div class="dashboard-card">
+          <h3>My materials</h3>
+          <ul id="materialsList"><li>Loading…</li></ul>
+        </div>
+      </div>
+
       <div class="dashboard-card">
         <h3>Share a study resource</h3>
+        <p class="card-hint">To share an AI-generated material, copy its link from "My materials" above into the link field below.</p>
         <form id="resourceForm" class="admin-form">
           <input id="resourceStudentEmail" type="email" placeholder="Student email" required />
           <input id="resourceTitle" type="text" placeholder="Title (e.g. GCSE Maths formula sheet)" required />
@@ -172,6 +194,7 @@
     import { initializeApp } from 'https://www.gstatic.com/firebasejs/12.4.0/firebase-app.js';
     import { getAuth, onAuthStateChanged, signOut } from 'https://www.gstatic.com/firebasejs/12.4.0/firebase-auth.js';
     import { getFirestore, collection, query, where, orderBy, getDocs, getDoc, addDoc, deleteDoc, updateDoc, doc, Timestamp, serverTimestamp, writeBatch } from 'https://www.gstatic.com/firebasejs/12.4.0/firebase-firestore.js';
+    import { getFunctions, httpsCallable } from 'https://www.gstatic.com/firebasejs/12.4.0/firebase-functions.js';
     import { firebaseConfig, isFirebaseConfigured } from './firebase-config.js';
 
     const DAY_NAMES = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
@@ -196,7 +219,12 @@
     const app = initializeApp(firebaseConfig);
     const auth = getAuth(app);
     const db = getFirestore(app);
+    const functions = getFunctions(app);
+    const generateMaterialCallable = httpsCallable(functions, 'generateMaterial');
     const welcomeMessage = document.getElementById('welcomeMessage');
+    const materialForm = document.getElementById('materialForm');
+    const materialFeedback = document.getElementById('materialFeedback');
+    const materialsList = document.getElementById('materialsList');
     const requestList = document.getElementById('requestList');
     const availabilityList = document.getElementById('availabilityList');
     const availabilityForm = document.getElementById('availabilityForm');
@@ -509,6 +537,71 @@
       await renderAssignments();
     });
 
+    function materialLink(materialId) {
+      return `${window.location.origin}${window.location.pathname.replace(/[^/]*$/, '')}material.html?id=${materialId}`;
+    }
+
+    async function renderMaterials() {
+      if (!auth.currentUser) return;
+      const materialsQuery = query(collection(db, 'materials'), where('createdBy', '==', auth.currentUser.uid));
+      const snapshot = await getDocs(materialsQuery);
+      const materials = snapshot.docs
+        .map((docSnap) => ({ id: docSnap.id, ...docSnap.data() }))
+        .sort((a, b) => (b.createdAt?.toMillis() || 0) - (a.createdAt?.toMillis() || 0));
+
+      materialsList.innerHTML = materials.length
+        ? materials.map((m) => `
+          <li>
+            <span><strong>${m.title}</strong> <span class="status-badge">${m.type}</span>${m.subject ? ` — ${m.subject}` : ''}</span>
+            <div class="dashboard-actions">
+              <a class="action-btn" href="material.html?id=${m.id}" target="_blank" rel="noopener">View</a>
+              <button class="action-btn secondary" data-copy-link="${m.id}" type="button">Copy link</button>
+              <button class="action-btn secondary" data-delete-material="${m.id}" type="button">Delete</button>
+            </div>
+          </li>
+        `).join('')
+        : '<li>No materials yet — generate one above.</li>';
+    }
+
+    materialsList.addEventListener('click', async (event) => {
+      const copyBtn = event.target.closest('button[data-copy-link]');
+      if (copyBtn) {
+        await navigator.clipboard.writeText(materialLink(copyBtn.dataset.copyLink));
+        copyBtn.textContent = 'Copied!';
+        setTimeout(() => { copyBtn.textContent = 'Copy link'; }, 1500);
+        return;
+      }
+
+      const deleteBtn = event.target.closest('button[data-delete-material]');
+      if (deleteBtn) {
+        if (!confirm('Delete this material? This can\'t be undone.')) return;
+        await deleteDoc(doc(db, 'materials', deleteBtn.dataset.deleteMaterial));
+        await renderMaterials();
+      }
+    });
+
+    materialForm.addEventListener('submit', async (event) => {
+      event.preventDefault();
+      materialFeedback.textContent = 'Generating… this can take a few moments.';
+      const submitBtn = materialForm.querySelector('button[type="submit"]');
+      submitBtn.disabled = true;
+
+      const type = document.getElementById('materialType').value;
+      const subject = document.getElementById('materialSubject').value.trim();
+      const topic = document.getElementById('materialTopic').value.trim();
+
+      try {
+        const response = await generateMaterialCallable({ type, subject, topic });
+        materialFeedback.textContent = `Created — ${materialLink(response.data.materialId)}`;
+        materialForm.reset();
+        await renderMaterials();
+      } catch (error) {
+        materialFeedback.textContent = error.message || 'Could not generate the material.';
+      } finally {
+        submitBtn.disabled = false;
+      }
+    });
+
     document.getElementById('resourceForm').addEventListener('submit', async (event) => {
       event.preventDefault();
       const resourceFeedback = document.getElementById('resourceFeedback');
@@ -709,6 +802,7 @@
       renderMyMatricGroups();
       renderMyMatricAssignments();
       renderMatricQuestions();
+      renderMaterials();
     });
 
     signOutBtn.addEventListener('click', async () => {

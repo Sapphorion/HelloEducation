@@ -267,6 +267,21 @@ service cloud.firestore {
       allow read: if signedIn() && (request.auth.uid == studentId || isAdmin(request.auth.uid));
     }
 
+    // AI-generated (or tutor-authored) worksheets/slideshows. Read is
+    // broadly signed-in rather than per-student, since a material is shared
+    // by pasting its viewer link into an existing study-resource/session
+    // material entry — there's no reverse index of who it was shared with,
+    // and the content itself isn't sensitive (same tradeoff as tutors/
+    // matricSubjects being broadly readable).
+    match /materials/{materialId} {
+      allow read: if signedIn();
+      allow create: if signedIn() && (
+        isAdmin(request.auth.uid)
+        || (isTutor(request.auth.uid) && request.resource.data.createdBy == request.auth.uid)
+      );
+      allow update, delete: if isAdmin(request.auth.uid) || resource.data.createdBy == request.auth.uid;
+    }
+
     match /dashboardData/{docId} {
       allow read: if signedIn() && (isAdmin(request.auth.uid) || isStudent(request.auth.uid) || isTutor(request.auth.uid));
       allow write: if isAdmin(request.auth.uid);

@@ -34,6 +34,21 @@ async function requireAdmin(requestAuth) {
   return callerUid;
 }
 
+async function requireTutorOrAdmin(requestAuth) {
+  const callerUid = requestAuth?.uid;
+  if (!callerUid) {
+    throw new HttpsError('unauthenticated', 'You must be signed in.');
+  }
+
+  const callerDoc = await db.doc(`users/${callerUid}`).get();
+  const role = callerDoc.exists ? callerDoc.data().role : null;
+  if (role !== 'tutor' && role !== 'admin') {
+    throw new HttpsError('permission-denied', 'Only a tutor or admin can do this.');
+  }
+
+  return callerUid;
+}
+
 async function requireStudent(requestAuth) {
   const callerUid = requestAuth?.uid;
   if (!callerUid) {
@@ -444,4 +459,143 @@ exports.askAI = onCall({ secrets: [anthropicApiKey] }, async (request) => {
   await batch.commit();
 
   return { reply: replyText };
+});
+
+// JSON schemas constraining the AI's output to a shape the viewer page and
+// the rest of the app can render deterministically, via output_config.format
+// rather than free-form text + hope-it-parses.
+function materialOutputFormat(type) {
+  if (type === 'worksheet') {
+    return {
+      type: 'json_schema',
+      schema: {
+        type: 'object',
+        properties: {
+          title: { type: 'string' },
+          instructions: { type: 'string' },
+          questions: {
+            type: 'array',
+            items: {
+              type: 'object',
+              properties: {
+                number: { type: 'integer' },
+                text: { type: 'string' }
+              },
+              required: ['number', 'text'],
+              additionalProperties: false
+            }
+          },
+          answerKey: {
+            type: 'array',
+            items: {
+              type: 'object',
+              properties: {
+                number: { type: 'integer' },
+                answer: { type: 'string' }
+              },
+              required: ['number', 'answer'],
+              additionalProperties: false
+            }
+          }
+        },
+        required: ['title', 'instructions', 'questions', 'answerKey'],
+        additionalProperties: false
+      }
+    };
+  }
+
+  return {
+    type: 'json_schema',
+    schema: {
+      type: 'object',
+      properties: {
+        title: { type: 'string' },
+        slides: {
+          type: 'array',
+          items: {
+            type: 'object',
+            properties: {
+              heading: { type: 'string' },
+              bullets: { type: 'array', items: { type: 'string' } },
+              notes: { type: 'string' }
+            },
+            required: ['heading', 'bullets', 'notes'],
+            additionalProperties: false
+          }
+        }
+      },
+      required: ['title', 'slides'],
+      additionalProperties: false
+    }
+  };
+}
+
+const MATERIAL_SYSTEM_PROMPTS = {
+  worksheet: 'You create clear, well-structured worksheets for tutoring students. Questions should build in difficulty and match the requested subject and topic. Provide a complete, correct answer key matching every question by number.',
+  slideshow: 'You create clear, well-structured slide decks for tutoring sessions. Each slide has a short heading, concise bullet points (not full paragraphs), and speaker notes with extra detail for the tutor to talk through while presenting.'
+};
+
+// Tutor/admin-facing "create a worksheet or slideshow with AI" tool. Returns
+// structured JSON (via output_config.format) rather than free text, so the
+// material viewer page can render it as a real worksheet/slide deck instead
+// of a wall of AI-generated prose.
+exports.generateMaterial = onCall({ secrets: [anthropicApiKey] }, async (request) => {
+  const callerUid = await requireTutorOrAdmin(request.auth);
+
+  const { type, subject, topic } = request.data || {};
+
+  if (type !== 'worksheet' && type !== 'slideshow') {
+    throw new HttpsError('invalid-argument', 'Material type must be worksheet or slideshow.');
+  }
+  const trimmedTopic = (topic || '').trim();
+  if (!trimmedTopic) {
+    throw new HttpsError('invalid-argument', 'Describe what the material should cover.');
+  }
+  if (trimmedTopic.length > 1000) {
+    throw new HttpsError('invalid-argument', 'Description is too long (1000 characters max).');
+  }
+  const trimmedSubject = (subject || '').trim();
+
+  const anthropic = new Anthropic({ apiKey: anthropicApiKey.value() });
+
+  let response;
+  try {
+    response = await anthropic.messages.create({
+      model: 'claude-opus-5',
+      max_tokens: 4096,
+      thinking: { type: 'adaptive' },
+      system: MATERIAL_SYSTEM_PROMPTS[type],
+      messages: [{
+        role: 'user',
+        content: `Subject: ${trimmedSubject || 'General'}\n\nCreate a ${type} covering: ${trimmedTopic}`
+      }],
+      output_config: { format: materialOutputFormat(type) }
+    });
+  } catch (error) {
+    throw new HttpsError('internal', 'Could not generate the material. Please try again.');
+  }
+
+  const textBlock = response.content.find((block) => block.type === 'text');
+  if (!textBlock) {
+    throw new HttpsError('internal', 'The AI did not return any content.');
+  }
+
+  let content;
+  try {
+    content = JSON.parse(textBlock.text);
+  } catch (error) {
+    throw new HttpsError('internal', 'Could not parse the generated material.');
+  }
+
+  const materialRef = await db.collection('materials').add({
+    title: content.title,
+    type,
+    subject: trimmedSubject,
+    topic: trimmedTopic,
+    content,
+    createdBy: callerUid,
+    createdAt: FieldValue.serverTimestamp()
+  });
+
+  return { materialId: materialRef.id, content };
 });

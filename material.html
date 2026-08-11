@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>HelloEducation Material</title>
+  <link rel="stylesheet" href="styling.css" />
+  <style>
+    @media print {
+      header, navigation, footer, .material-print-hide { display: none !important; }
+      body { background: white !important; padding: 0 !important; }
+      .auth-panel { box-shadow: none !important; }
+    }
+  </style>
+</head>
+<body>
+  <header class="material-print-hide">
+    <h1>HelloEducation</h1>
+    <h1 class="page-heading">Material</h1>
+  </header>
+
+  <navigation class="material-print-hide">
+    <ul>
+      <li><a href="index.html">Home</a></li>
+      <li><a href="services.html">Services</a></li>
+      <li><a href="tutors.html">Tutors</a></li>
+      <li><a href="contact.html">Contact</a></li>
+    </ul>
+  </navigation>
+
+  <main class="auth-page">
+    <section class="auth-panel dashboard-panel">
+      <div class="material-print-hide dashboard-actions" style="margin-bottom:1rem;">
+        <button id="backBtn" class="action-btn secondary" type="button">&larr; Back</button>
+        <button id="printBtn" class="action-btn secondary" type="button">Print / Save as PDF</button>
+      </div>
+
+      <div id="materialContent">
+        <p class="auth-feedback" id="loadFeedback">Loading material…</p>
+      </div>
+    </section>
+  </main>
+
+  <footer class="material-print-hide">
+    <p>&copy; 2023 HelloEducation. All rights reserved.</p>
+  </footer>
+
+  <script type="module">
+    import { initializeApp } from 'https://www.gstatic.com/firebasejs/12.4.0/firebase-app.js';
+    import { getAuth, onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/12.4.0/firebase-auth.js';
+    import { getFirestore, doc, getDoc } from 'https://www.gstatic.com/firebasejs/12.4.0/firebase-firestore.js';
+    import { firebaseConfig, isFirebaseConfigured } from './firebase-config.js';
+
+    const params = new URLSearchParams(window.location.search);
+    const materialId = params.get('id');
+
+    const app = initializeApp(firebaseConfig);
+    const auth = getAuth(app);
+    const db = getFirestore(app);
+    const materialContent = document.getElementById('materialContent');
+    const loadFeedback = document.getElementById('loadFeedback');
+
+    document.getElementById('backBtn').addEventListener('click', () => {
+      if (window.history.length > 1) {
+        window.history.back();
+      } else {
+        window.location.href = 'login.html';
+      }
+    });
+
+    document.getElementById('printBtn').addEventListener('click', () => window.print());
+
+    function escapeHtml(str) {
+      const div = document.createElement('div');
+      div.textContent = str || '';
+      return div.innerHTML;
+    }
+
+    function renderWorksheet(material) {
+      const c = material.content;
+      materialContent.innerHTML = `
+        <h2>${escapeHtml(c.title)}</h2>
+        <p class="card-hint">${escapeHtml(material.subject)}</p>
+        <p>${escapeHtml(c.instructions)}</p>
+        <ol>
+          ${c.questions.map((q) => `<li>${escapeHtml(q.text)}</li>`).join('')}
+        </ol>
+        <details style="margin-top:1.5rem;">
+          <summary>Show answer key</summary>
+          <ol>
+            ${c.answerKey.map((a) => `<li>${escapeHtml(a.answer)}</li>`).join('')}
+          </ol>
+        </details>
+      `;
+    }
+
+    function renderSlideshow(material) {
+      const c = material.content;
+      let current = 0;
+
+      materialContent.innerHTML = `
+        <h2>${escapeHtml(c.title)}</h2>
+        <p class="card-hint">${escapeHtml(material.subject)}</p>
+        <div class="session-hero">
+          <h3 id="slideHeading"></h3>
+          <ul id="slideBullets"></ul>
+          <p class="card-hint" id="slideNotes"></p>
+        </div>
+        <div class="week-nav material-print-hide">
+          <button id="prevSlideBtn" class="action-btn secondary" type="button">&larr; Previous</button>
+          <span class="week-nav-label" id="slideLabel"></span>
+          <button id="nextSlideBtn" class="action-btn secondary" type="button">Next &rarr;</button>
+        </div>
+        <div id="allSlidesPrint" style="display:none;"></div>
+      `;
+
+      const slideHeading = document.getElementById('slideHeading');
+      const slideBullets = document.getElementById('slideBullets');
+      const slideNotes = document.getElementById('slideNotes');
+      const slideLabel = document.getElementById('slideLabel');
+
+      function renderCurrent() {
+        const slide = c.slides[current];
+        slideHeading.textContent = slide.heading;
+        slideBullets.innerHTML = slide.bullets.map((b) => `<li>${escapeHtml(b)}</li>`).join('');
+        slideNotes.textContent = slide.notes ? `Notes: ${slide.notes}` : '';
+        slideLabel.textContent = `Slide ${current + 1} of ${c.slides.length}`;
+      }
+
+      document.getElementById('prevSlideBtn').addEventListener('click', () => {
+        current = (current - 1 + c.slides.length) % c.slides.length;
+        renderCurrent();
+      });
+      document.getElementById('nextSlideBtn').addEventListener('click', () => {
+        current = (current + 1) % c.slides.length;
+        renderCurrent();
+      });
+
+      renderCurrent();
+
+      document.getElementById('allSlidesPrint').innerHTML = c.slides.map((slide) => `
+        <div class="dashboard-card">
+          <h3>${escapeHtml(slide.heading)}</h3>
+          <ul>${slide.bullets.map((b) => `<li>${escapeHtml(b)}</li>`).join('')}</ul>
+          ${slide.notes ? `<p class="card-hint">Notes: ${escapeHtml(slide.notes)}</p>` : ''}
+        </div>
+      `).join('');
+    }
+
+    async function loadMaterial() {
+      if (!materialId) {
+        loadFeedback.textContent = 'This material link looks invalid.';
+        return;
+      }
+
+      let materialSnap;
+      try {
+        materialSnap = await getDoc(doc(db, 'materials', materialId));
+      } catch (error) {
+        loadFeedback.textContent = "You don't have access to this material.";
+        return;
+      }
+
+      if (!materialSnap.exists()) {
+        loadFeedback.textContent = 'This material no longer exists.';
+        return;
+      }
+
+      const material = materialSnap.data();
+      if (material.type === 'worksheet') {
+        renderWorksheet(material);
+      } else if (material.type === 'slideshow') {
+        renderSlideshow(material);
+      } else {
+        loadFeedback.textContent = 'Unknown material type.';
+      }
+    }
+
+    onAuthStateChanged(auth, (user) => {
+      if (!user && !isFirebaseConfigured()) {
+        loadFeedback.textContent = 'Demo mode is active — materials need a connected Firebase project.';
+        return;
+      }
+
+      if (!user) {
+        window.location.href = 'login.html';
+        return;
+      }
+
+      loadMaterial();
+    });
+  </script>
+</body>
+</html>
