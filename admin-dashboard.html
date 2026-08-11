@@ -502,7 +502,7 @@
             return `<li>${label} <button class="action-btn secondary" data-remove-student="${uid}" data-group-id="${g.id}" type="button">Remove</button></li>`;
           }).join('');
           return `
-            <li>
+            <li class="matric-group-item">
               <div>
                 <strong>${g.subject}</strong> — ${DAY_NAMES[g.dayOfWeek]} ${g.startTime}–${g.endTime} — Tutor: ${g.tutorName}
                 <span class="status-badge">${(g.studentIds || []).length}/${g.capacity || 4}</span>

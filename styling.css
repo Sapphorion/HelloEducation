@@ -8,27 +8,28 @@ body {
   font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
   background: linear-gradient(125deg, #3074f3 0%, #2a9b1b 80%);
   min-height: 100vh;
-  padding: 40px 20px;
+  padding: 20px 20px 40px;
   line-height: 1.6;
   color: #333;
   font-size: 18px;
   font-weight: 500;
+  overflow-wrap: break-word;
 }
 
 header {
   color: white;
-  padding: 1rem;
+  padding: 0.5rem 1rem;
   text-align: center;
 }
 
 header h1 {
-  font-size: 3.5rem;
-  margin: 0.25rem 0;
+  font-size: 2.1rem;
+  margin: 0 0 0.2rem;
 }
 
 header h1.page-heading {
-  font-size: 2rem;
-  margin-bottom: 30px;
+  font-size: 1.25rem;
+  margin-bottom: 10px;
 }
 
 main {
@@ -47,31 +48,33 @@ footer {
 
 @media (max-width: 768px) {
   body {
-    padding: 30px 15px;
+    padding: 16px 15px 30px;
     font-size: 16px;
   }
 
   header h1 {
-    font-size: 2.5rem;
+    font-size: 1.6rem;
   }
 
   header h1.page-heading {
-    font-size: 1.5rem;
+    font-size: 1rem;
+    margin-bottom: 8px;
   }
 }
 
 @media (max-width: 480px) {
   body {
-    padding: 20px 10px;
+    padding: 12px 10px 20px;
     font-size: 14px;
   }
 
   header h1 {
-    font-size: 1.75rem;
+    font-size: 1.4rem;
   }
 
   header h1.page-heading {
-    font-size: 1.2rem;
+    font-size: 0.9rem;
+    margin-bottom: 6px;
   }
 }
 
@@ -177,12 +180,14 @@ navigation a:hover {
 
 .auth-tabs {
   display: flex;
+  flex-wrap: wrap;
   gap: 0.5rem;
   margin-bottom: 1rem;
 }
 
 .auth-tab {
-  flex: 1;
+  flex: 1 1 auto;
+  min-width: 88px;
   border: none;
   border-radius: 999px;
   padding: 0.7rem 1rem;
@@ -292,9 +297,15 @@ navigation a:hover {
   padding: 0.6rem 0.7rem;
   color: #334155;
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
   gap: 0.5rem;
+}
+
+.matric-group-item {
+  flex-direction: column;
+  align-items: stretch;
 }
 
 .task-item.done span {
