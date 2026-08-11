@@ -143,6 +143,23 @@
         </div>
       </div>
 
+      <div class="dashboard-card">
+        <h3>Share a Second Chance study resource</h3>
+        <form id="matricResourceForm" class="admin-form">
+          <input id="matricResourceStudentEmail" type="email" placeholder="Student email" required />
+          <input id="matricResourceTitle" type="text" placeholder="Title (e.g. Maths formula sheet)" required />
+          <input id="matricResourceType" type="text" placeholder="Type (e.g. PDF, Link, Worksheet)" required />
+          <input id="matricResourceUrl" type="url" placeholder="Link (optional)" />
+          <button type="submit">Share</button>
+        </form>
+        <p class="auth-feedback" id="matricResourceFeedback"></p>
+      </div>
+
+      <div class="dashboard-card">
+        <h3>Second Chance questions from students</h3>
+        <ul id="matricQuestionsList"><li>Loading…</li></ul>
+      </div>
+
       <button id="signOutBtn" type="button">Sign Out</button>
     </section>
   </main>
@@ -236,6 +253,81 @@
         repliedAt: serverTimestamp()
       });
       await renderQuestions();
+    });
+
+    document.getElementById('matricResourceForm').addEventListener('submit', async (event) => {
+      event.preventDefault();
+      const matricResourceFeedback = document.getElementById('matricResourceFeedback');
+      matricResourceFeedback.textContent = 'Sharing…';
+
+      const studentEmail = document.getElementById('matricResourceStudentEmail').value.trim();
+      const title = document.getElementById('matricResourceTitle').value.trim();
+      const type = document.getElementById('matricResourceType').value.trim();
+      const url = document.getElementById('matricResourceUrl').value.trim();
+
+      const studentQuery = query(collection(db, 'matricStudents'), where('email', '==', studentEmail));
+      const studentSnap = await getDocs(studentQuery);
+
+      if (studentSnap.empty) {
+        matricResourceFeedback.textContent = 'No Second Chance student found with that email.';
+        return;
+      }
+
+      await addDoc(collection(db, 'matricStudyResources'), {
+        studentId: studentSnap.docs[0].id,
+        studentEmail,
+        title,
+        type,
+        url: url || null,
+        createdBy: auth.currentUser.uid,
+        createdAt: serverTimestamp()
+      });
+
+      matricResourceFeedback.textContent = 'Shared.';
+      event.target.reset();
+    });
+
+    const matricQuestionsList = document.getElementById('matricQuestionsList');
+
+    async function renderMatricQuestions() {
+      if (!auth.currentUser) return;
+      const questionsQuery = query(collection(db, 'matricQuestions'), where('tutorId', '==', auth.currentUser.uid));
+      const snapshot = await getDocs(questionsQuery);
+      const questions = snapshot.docs
+        .map((docSnap) => ({ id: docSnap.id, ...docSnap.data() }))
+        .sort((a, b) => (b.createdAt?.toMillis() || 0) - (a.createdAt?.toMillis() || 0));
+
+      matricQuestionsList.innerHTML = questions.length
+        ? questions.map((q) => `
+          <li>
+            <div>
+              <strong>${q.subject}</strong> — ${q.studentEmail} <span class="status-badge">${q.status}</span>
+              <br>${q.message}
+              ${q.reply ? `<br>Your reply: ${q.reply}` : ''}
+            </div>
+            ${q.status === 'open' ? `
+              <div class="dashboard-actions">
+                <input type="text" placeholder="Reply" data-reply-input="${q.id}" />
+                <button class="action-btn" data-send-reply="${q.id}" type="button">Send reply</button>
+              </div>
+            ` : ''}
+          </li>
+        `).join('')
+        : '<li>No questions yet.</li>';
+    }
+
+    matricQuestionsList.addEventListener('click', async (event) => {
+      const button = event.target.closest('button[data-send-reply]');
+      if (!button) return;
+      const replyInput = matricQuestionsList.querySelector(`input[data-reply-input="${button.dataset.sendReply}"]`);
+      const reply = replyInput.value.trim();
+      if (!reply) return;
+      await updateDoc(doc(db, 'matricQuestions', button.dataset.sendReply), {
+        reply,
+        status: 'answered',
+        repliedAt: serverTimestamp()
+      });
+      await renderMatricQuestions();
     });
 
     let allMyMatricGroups = [];
@@ -594,6 +686,7 @@
       renderQuestions();
       renderMyMatricGroups();
       renderMyMatricAssignments();
+      renderMatricQuestions();
     });
 
     signOutBtn.addEventListener('click', async () => {

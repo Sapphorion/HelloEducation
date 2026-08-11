@@ -205,6 +205,18 @@
             <p class="auth-feedback" id="matricAssignFeedback"></p>
           </div>
         </div>
+
+        <div class="dashboard-card">
+          <h3>Share a Second Chance study resource</h3>
+          <form id="matricResourceForm" class="admin-form">
+            <input id="matricResourceStudentEmail" type="email" placeholder="Student email" required />
+            <input id="matricResourceTitle" type="text" placeholder="Title" required />
+            <input id="matricResourceType" type="text" placeholder="Type (e.g. PDF, Link, Worksheet)" required />
+            <input id="matricResourceUrl" type="url" placeholder="Link (optional)" />
+            <button type="submit">Share</button>
+          </form>
+          <p class="auth-feedback" id="matricResourceFeedback"></p>
+        </div>
       </section>
 
       <button id="signOutBtn" type="button">Sign Out</button>
@@ -343,6 +355,38 @@
       });
 
       resourceFeedback.textContent = 'Shared.';
+      event.target.reset();
+    });
+
+    document.getElementById('matricResourceForm').addEventListener('submit', async (event) => {
+      event.preventDefault();
+      const matricResourceFeedback = document.getElementById('matricResourceFeedback');
+      matricResourceFeedback.textContent = 'Sharing…';
+
+      const studentEmail = document.getElementById('matricResourceStudentEmail').value.trim();
+      const title = document.getElementById('matricResourceTitle').value.trim();
+      const type = document.getElementById('matricResourceType').value.trim();
+      const url = document.getElementById('matricResourceUrl').value.trim();
+
+      const studentQuery = query(collection(db, 'matricStudents'), where('email', '==', studentEmail));
+      const studentSnap = await getDocs(studentQuery);
+
+      if (studentSnap.empty) {
+        matricResourceFeedback.textContent = 'No Second Chance student found with that email.';
+        return;
+      }
+
+      await addDoc(collection(db, 'matricStudyResources'), {
+        studentId: studentSnap.docs[0].id,
+        studentEmail,
+        title,
+        type,
+        url: url || null,
+        createdBy: auth.currentUser.uid,
+        createdAt: serverTimestamp()
+      });
+
+      matricResourceFeedback.textContent = 'Shared.';
       event.target.reset();
     });
 

@@ -48,6 +48,26 @@ async function requireStudent(requestAuth) {
   return { uid: callerUid, email: callerDoc.data().email };
 }
 
+// Like requireStudent, but also accepts the Second Chance programme's
+// matricStudent role — used only by the shared AI homework helper below,
+// since that feature is the same for both cohorts. requestSession stays
+// student-only via requireStudent, since Second Chance students don't book
+// ad-hoc sessions — they're enrolled in fixed class slots instead.
+async function requireAnyStudent(requestAuth) {
+  const callerUid = requestAuth?.uid;
+  if (!callerUid) {
+    throw new HttpsError('unauthenticated', 'You must be signed in.');
+  }
+
+  const callerDoc = await db.doc(`users/${callerUid}`).get();
+  const role = callerDoc.exists ? callerDoc.data().role : null;
+  if (role !== 'student' && role !== 'matricStudent') {
+    throw new HttpsError('permission-denied', 'Only a student can do this.');
+  }
+
+  return { uid: callerUid, email: callerDoc.data().email };
+}
+
 // Creates a Firebase Auth account plus its Firestore role/profile docs in one
 // step. Only callable by an existing admin — the client SDK can't safely do
 // this itself because creating a user with createUserWithEmailAndPassword()
@@ -352,21 +372,22 @@ exports.enrollMatricStudent = onCall(async (request) => {
   };
 });
 
-const AI_SYSTEM_PROMPT = `You are a friendly, patient homework helper for HelloEducation, a tutoring service for school-age students. Help with any subject the student asks about: explain concepts clearly, work through problems step by step, and encourage understanding rather than just handing over final answers when it helps their learning.
+const AI_SYSTEM_PROMPT = `You are a friendly, patient homework helper for HelloEducation, a tutoring service. Your students range from school-age learners to adults completing their matric through the Second Chance Programme, so don't assume a particular age — take your cue from how the student writes. Help with any subject the student asks about: explain concepts clearly, work through problems step by step, and encourage understanding rather than just handing over final answers when it helps their learning.
 
-Keep responses age-appropriate, encouraging, and reasonably concise. If a student asks about something harmful, unsafe, or inappropriate, or something unrelated to schoolwork or learning, gently decline and suggest they speak with their tutor or a trusted adult instead.
+Keep responses respectful, encouraging, and reasonably concise. If a student asks about something harmful, unsafe, or inappropriate, or something unrelated to schoolwork or learning, gently decline and suggest they speak with their tutor instead.
 
 You are not a replacement for their tutor. For anything requiring real judgment — grades, personal issues, scheduling, disputes — tell them to contact their tutor or the HelloEducation admin.`;
 
 const AI_DAILY_MESSAGE_LIMIT = 40;
 const AI_HISTORY_LOOKBACK = 10;
 
-// Student-facing homework helper chatbot. Only callable by a student — checks
-// and increments a per-student daily message count in the same transaction
-// so concurrent requests can't slip past the cap, then calls the Anthropic
-// API with a short window of prior turns for context.
+// Student-facing homework helper chatbot. Callable by a student or a Second
+// Chance (matricStudent) — checks and increments a per-student daily message
+// count in the same transaction so concurrent requests can't slip past the
+// cap, then calls the Anthropic API with a short window of prior turns for
+// context. Shared across both cohorts since it's the same feature either way.
 exports.askAI = onCall({ secrets: [anthropicApiKey] }, async (request) => {
-  const student = await requireStudent(request.auth);
+  const student = await requireAnyStudent(request.auth);
 
   const message = (request.data?.message || '').trim();
   if (!message) {

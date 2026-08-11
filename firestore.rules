@@ -203,9 +203,42 @@ service cloud.firestore {
       allow delete: if isAdmin(request.auth.uid) || resource.data.createdBy == request.auth.uid;
     }
 
+    // A Second Chance student asks a specific tutor a question; same shape
+    // as questions/{questionId} above, kept as a separate collection since
+    // matric students are a separate role. Ownership-checked rather than
+    // role-gated on create, matching matricAssignments above.
+    match /matricQuestions/{questionId} {
+      allow read: if signedIn() && (
+        resource.data.studentId == request.auth.uid
+        || resource.data.tutorId == request.auth.uid
+        || isAdmin(request.auth.uid)
+      );
+      allow create: if signedIn() && request.resource.data.studentId == request.auth.uid;
+      allow update: if signedIn() && (resource.data.tutorId == request.auth.uid || isAdmin(request.auth.uid));
+      allow delete: if isAdmin(request.auth.uid) || resource.data.studentId == request.auth.uid;
+    }
+
+    // Study resources for the Second Chance programme. Same shape as
+    // studyResources/{resourceId} above, kept separate for the same reason.
+    match /matricStudyResources/{resourceId} {
+      allow read: if signedIn() && (
+        resource.data.studentId == request.auth.uid
+        || resource.data.createdBy == request.auth.uid
+        || isAdmin(request.auth.uid)
+      );
+      allow create: if signedIn() && (
+        isAdmin(request.auth.uid)
+        || (isTutor(request.auth.uid) && request.resource.data.createdBy == request.auth.uid)
+      );
+      allow update: if signedIn() && (isAdmin(request.auth.uid) || resource.data.createdBy == request.auth.uid);
+      allow delete: if isAdmin(request.auth.uid) || resource.data.createdBy == request.auth.uid;
+    }
+
     // AI homework-helper chat transcript. Written only by the askAI Cloud
     // Function via the Admin SDK (bypasses these rules) — no client write
     // path, since the transcript must stay paired with the rate-limit check.
+    // Keyed by uid only (not role), so this already covers Second Chance
+    // students using the same shared chatbot — no change needed here.
     match /aiConversations/{studentId}/messages/{messageId} {
       allow read: if signedIn() && (request.auth.uid == studentId || isAdmin(request.auth.uid));
     }
