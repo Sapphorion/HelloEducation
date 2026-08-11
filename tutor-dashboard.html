@@ -689,7 +689,7 @@
       await renderMySessions();
     });
 
-    onAuthStateChanged(auth, (user) => {
+    onAuthStateChanged(auth, async (user) => {
       if (!user && !isFirebaseConfigured()) {
         welcomeMessage.textContent = `Welcome back, ${localStorage.getItem('helloEducationUser') || 'tutor'}!`;
         return;
@@ -700,7 +700,8 @@
         return;
       }
 
-      welcomeMessage.textContent = `Welcome back, ${user.email || 'tutor'}!`;
+      const userDocSnap = await getDoc(doc(db, 'users', user.uid));
+      welcomeMessage.textContent = `Welcome back, ${(userDocSnap.exists() && userDocSnap.data().name) || user.email || 'tutor'}!`;
       renderMySessions();
       renderAvailability();
       renderAssignments();

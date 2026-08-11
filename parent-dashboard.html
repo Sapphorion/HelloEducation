@@ -109,7 +109,7 @@
       summaryText.textContent = `Showing ${childUids.length} linked ${childUids.length === 1 ? 'child' : 'children'}.`;
     }
 
-    onAuthStateChanged(auth, (user) => {
+    onAuthStateChanged(auth, async (user) => {
       if (!user && !isFirebaseConfigured()) {
         welcomeMessage.textContent = `Welcome back, ${localStorage.getItem('helloEducationUser') || 'parent'}!`;
         summaryText.textContent = 'Demo mode is active. Connect Firebase to see real data.';
@@ -121,7 +121,8 @@
         return;
       }
 
-      welcomeMessage.textContent = `Welcome back, ${user.email || 'parent'}!`;
+      const userDocSnap = await getDoc(doc(db, 'users', user.uid));
+      welcomeMessage.textContent = `Welcome back, ${(userDocSnap.exists() && userDocSnap.data().name) || user.email || 'parent'}!`;
       renderChildren();
     });
 

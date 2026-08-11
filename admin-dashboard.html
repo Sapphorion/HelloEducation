@@ -230,7 +230,7 @@
   <script type="module">
     import { initializeApp } from 'https://www.gstatic.com/firebasejs/12.4.0/firebase-app.js';
     import { getAuth, onAuthStateChanged, signOut } from 'https://www.gstatic.com/firebasejs/12.4.0/firebase-auth.js';
-    import { getFirestore, collection, query, where, getDocs, updateDoc, doc, deleteDoc, addDoc, serverTimestamp, writeBatch, Timestamp } from 'https://www.gstatic.com/firebasejs/12.4.0/firebase-firestore.js';
+    import { getFirestore, collection, query, where, getDocs, getDoc, updateDoc, doc, deleteDoc, addDoc, serverTimestamp, writeBatch, Timestamp } from 'https://www.gstatic.com/firebasejs/12.4.0/firebase-firestore.js';
     import { getFunctions, httpsCallable } from 'https://www.gstatic.com/firebasejs/12.4.0/firebase-functions.js';
     import { firebaseConfig, isFirebaseConfigured } from './firebase-config.js';
 
@@ -895,7 +895,7 @@
       await renderTutorDirectory();
     });
 
-    onAuthStateChanged(auth, (user) => {
+    onAuthStateChanged(auth, async (user) => {
       if (!user && !isFirebaseConfigured()) {
         welcomeMessage.textContent = `Welcome back, ${localStorage.getItem('helloEducationUser') || 'admin'}!`;
         summaryText.textContent = 'Demo mode is active. Connect Firebase to enable full admin control.';
@@ -907,7 +907,8 @@
         return;
       }
 
-      welcomeMessage.textContent = `Welcome back, ${user.email || 'admin'}!`;
+      const userDocSnap = await getDoc(doc(db, 'users', user.uid));
+      welcomeMessage.textContent = `Welcome back, ${(userDocSnap.exists() && userDocSnap.data().name) || user.email || 'admin'}!`;
       summaryText.textContent = 'Your admin account is ready.';
       renderTutorDirectory();
       renderAccountsDirectory();
