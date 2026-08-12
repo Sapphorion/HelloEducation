@@ -89,6 +89,8 @@
           <input id="resourceTitle" type="text" placeholder="Title" required />
           <input id="resourceType" type="text" placeholder="Type (e.g. PDF, Link, Worksheet)" required />
           <input id="resourceUrl" type="url" placeholder="Link (optional)" />
+          <label class="card-hint" for="resourceFile">Or upload a file (PDF, Word, PowerPoint, image — max 10MB)</label>
+          <input id="resourceFile" type="file" accept=".pdf,.doc,.docx,.ppt,.pptx,.xls,.xlsx,image/*" />
           <button type="submit">Share with class</button>
         </form>
         <p class="auth-feedback" id="resourceFeedback"></p>
@@ -117,6 +119,7 @@
     import { initializeApp } from 'https://www.gstatic.com/firebasejs/12.4.0/firebase-app.js';
     import { getAuth, onAuthStateChanged, signOut } from 'https://www.gstatic.com/firebasejs/12.4.0/firebase-auth.js';
     import { getFirestore, collection, query, where, orderBy, limit, getDocs, updateDoc, doc, deleteDoc, addDoc, serverTimestamp, writeBatch, arrayRemove, Timestamp } from 'https://www.gstatic.com/firebasejs/12.4.0/firebase-firestore.js';
+    import { getStorage, ref, uploadBytes, getDownloadURL } from 'https://www.gstatic.com/firebasejs/12.4.0/firebase-storage.js';
     import { firebaseConfig, isFirebaseConfigured } from './firebase-config.js';
 
     const role = localStorage.getItem('helloEducationRole');
@@ -132,6 +135,7 @@
     const app = initializeApp(firebaseConfig);
     const auth = getAuth(app);
     const db = getFirestore(app);
+    const storage = getStorage(app);
     const DAY_NAMES = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 
     function generateMeetingLink() {
@@ -361,11 +365,19 @@
         return;
       }
 
-      resourceFeedback.textContent = 'Sharing…';
       const title = document.getElementById('resourceTitle').value.trim();
       const type = document.getElementById('resourceType').value.trim();
-      const url = document.getElementById('resourceUrl').value.trim();
+      let url = document.getElementById('resourceUrl').value.trim();
+      const file = document.getElementById('resourceFile').files[0];
 
+      if (file) {
+        resourceFeedback.textContent = 'Uploading…';
+        const fileRef = ref(storage, `study-resources/${auth.currentUser.uid}/${Date.now()}-${file.name}`);
+        await uploadBytes(fileRef, file);
+        url = await getDownloadURL(fileRef);
+      }
+
+      resourceFeedback.textContent = 'Sharing…';
       const batch = writeBatch(db);
       roster.forEach((student) => {
         batch.set(doc(collection(db, 'matricStudyResources')), {

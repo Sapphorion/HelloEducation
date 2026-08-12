@@ -133,6 +133,8 @@
           <input id="resourceTitle" type="text" placeholder="Title (e.g. GCSE Maths formula sheet)" required />
           <input id="resourceType" type="text" placeholder="Type (e.g. PDF, Link, Worksheet)" required />
           <input id="resourceUrl" type="url" placeholder="Link (optional)" />
+          <label class="card-hint" for="resourceFile">Or upload a file (PDF, Word, PowerPoint, image — max 10MB)</label>
+          <input id="resourceFile" type="file" accept=".pdf,.doc,.docx,.ppt,.pptx,.xls,.xlsx,image/*" />
           <button type="submit">Share</button>
         </form>
         <p class="auth-feedback" id="resourceFeedback"></p>
@@ -212,6 +214,7 @@
     import { initializeApp } from 'https://www.gstatic.com/firebasejs/12.4.0/firebase-app.js';
     import { getAuth, onAuthStateChanged, signOut, EmailAuthProvider, reauthenticateWithCredential, updatePassword } from 'https://www.gstatic.com/firebasejs/12.4.0/firebase-auth.js';
     import { getFirestore, collection, query, where, orderBy, getDocs, getDoc, addDoc, deleteDoc, updateDoc, doc, Timestamp, serverTimestamp, writeBatch } from 'https://www.gstatic.com/firebasejs/12.4.0/firebase-firestore.js';
+    import { getStorage, ref, uploadBytes, getDownloadURL } from 'https://www.gstatic.com/firebasejs/12.4.0/firebase-storage.js';
     import { getFunctions, httpsCallable } from 'https://www.gstatic.com/firebasejs/12.4.0/firebase-functions.js';
     import { firebaseConfig, isFirebaseConfigured } from './firebase-config.js';
 
@@ -237,6 +240,7 @@
     const app = initializeApp(firebaseConfig);
     const auth = getAuth(app);
     const db = getFirestore(app);
+    const storage = getStorage(app);
     const functions = getFunctions(app);
     const generateMaterialCallable = httpsCallable(functions, 'generateMaterial');
     const welcomeMessage = document.getElementById('welcomeMessage');
@@ -630,7 +634,8 @@
       const studentEmail = document.getElementById('resourceStudentEmail').value.trim();
       const title = document.getElementById('resourceTitle').value.trim();
       const type = document.getElementById('resourceType').value.trim();
-      const url = document.getElementById('resourceUrl').value.trim();
+      let url = document.getElementById('resourceUrl').value.trim();
+      const file = document.getElementById('resourceFile').files[0];
 
       const studentQuery = query(collection(db, 'users'), where('email', '==', studentEmail), where('role', '==', 'student'));
       const studentSnap = await getDocs(studentQuery);
@@ -638,6 +643,13 @@
       if (studentSnap.empty) {
         resourceFeedback.textContent = 'No student account found with that email.';
         return;
+      }
+
+      if (file) {
+        resourceFeedback.textContent = 'Uploading…';
+        const fileRef = ref(storage, `study-resources/${auth.currentUser.uid}/${Date.now()}-${file.name}`);
+        await uploadBytes(fileRef, file);
+        url = await getDownloadURL(fileRef);
       }
 
       await addDoc(collection(db, 'studyResources'), {

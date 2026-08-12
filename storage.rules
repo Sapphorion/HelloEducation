@@ -41,5 +41,26 @@ service firebase.storage {
         && request.auth.uid == studentId
         && request.resource.size < 10 * 1024 * 1024;
     }
+
+    // Study resource attachments (worksheets, PDFs, etc.) a tutor/admin
+    // uploads to share with student(s). Read is left open to any signed-in
+    // user rather than cross-referenced per student: the actual "who can
+    // see this" gate is the studyResources/matricStudyResources Firestore
+    // doc (whether the app ever hands a given user this file's download
+    // URL at all) — and getDownloadURL() tokens bypass Storage read rules
+    // for anyone holding the link anyway, same as the submission files
+    // above, so a stricter rule here wouldn't add real protection.
+    match /study-resources/{uid}/{fileName} {
+      function isTutorOrAdmin() {
+        let role = firestore.get(/databases/(default)/documents/users/$(request.auth.uid)).data.role;
+        return role == 'tutor' || role == 'admin';
+      }
+
+      allow read: if request.auth != null;
+      allow write: if request.auth != null
+        && request.auth.uid == uid
+        && isTutorOrAdmin()
+        && request.resource.size < 10 * 1024 * 1024;
+    }
   }
 }
