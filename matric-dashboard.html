@@ -34,6 +34,12 @@
       <p id="summaryText">Loading your dashboard…</p>
 
       <div class="dashboard-card">
+        <h3>My subjects</h3>
+        <p class="card-hint">Enrolling in a subject doesn't need a class time to exist yet — you'll see "Awaiting a class time" here until admin schedules one.</p>
+        <ul id="mySubjectsList"><li>Loading…</li></ul>
+      </div>
+
+      <div class="dashboard-card">
         <h3>My weekly timetable</h3>
         <p class="card-hint">Click a class to join the session or see that day's materials. The same video link is used every week, Monday–Thursday, 9am–3pm.</p>
         <div class="week-nav">
@@ -124,6 +130,7 @@
     const askAICallable = httpsCallable(functions, 'askAI');
     const welcomeMessage = document.getElementById('welcomeMessage');
     const summaryText = document.getElementById('summaryText');
+    const mySubjectsList = document.getElementById('mySubjectsList');
     const weekCalendar = document.getElementById('weekCalendar');
     const weekLabel = document.getElementById('weekLabel');
     const prevWeekBtn = document.getElementById('prevWeekBtn');
@@ -217,6 +224,22 @@
       askTutor.innerHTML = tutorsByGroup.length
         ? '<option value="">Choose a tutor…</option>' + tutorsByGroup.map((g) => `<option value="${g.tutorId}" data-subject="${g.subject}">${g.tutorName} — ${g.subject}</option>`).join('')
         : '<option value="">No enrolled classes yet</option>';
+    }
+
+    async function renderMySubjects() {
+      if (!auth.currentUser) return;
+      const studentDocSnap = await getDoc(doc(db, 'matricStudents', auth.currentUser.uid));
+      const subjects = (studentDocSnap.exists() && studentDocSnap.data().subjects) || [];
+
+      mySubjectsList.innerHTML = subjects.length
+        ? subjects.map((subject) => {
+          const group = myGroups.find((g) => g.subject === subject);
+          const statusBadge = group
+            ? `<span class="status-badge">${DAY_NAMES[group.dayOfWeek]} ${group.startTime}–${group.endTime} (${group.tutorName})</span>`
+            : `<span class="status-badge" style="background:#fef3c7;color:#92400e;">Awaiting a class time</span>`;
+          return `<li>${subject} ${statusBadge}</li>`;
+        }).join('')
+        : '<li>Not enrolled in any subjects yet — contact the HelloEducation admin to get started.</li>';
     }
 
     async function renderResources() {
@@ -409,7 +432,7 @@
       const userDocSnap = await getDoc(doc(db, 'users', user.uid));
       welcomeMessage.textContent = `Welcome back, ${(userDocSnap.exists() && userDocSnap.data().name) || user.email || 'student'}!`;
       summaryText.textContent = 'Here\'s your Second Chance Programme timetable and workload.';
-      renderTimetable();
+      renderTimetable().then(renderMySubjects);
       renderTasks();
       renderResources();
       renderAIChat();

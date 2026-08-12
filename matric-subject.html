@@ -1,0 +1,461 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>HelloEducation Admin — Second Chance Subject</title>
+  <link rel="stylesheet" href="styling.css" />
+  <link rel="manifest" href="manifest.json" />
+  <link rel="icon" href="favicon.ico" />
+  <link rel="apple-touch-icon" href="icons/apple-touch-icon.png" />
+  <meta name="theme-color" content="#3074f3" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="HelloEducation" />
+</head>
+<body>
+  <header>
+    <h1>HelloEducation</h1>
+    <h1 class="page-heading" id="pageHeading">Second Chance — Subject</h1>
+  </header>
+
+  <navigation>
+    <ul>
+      <li><a href="index.html">Home</a></li>
+      <li><a href="services.html">Services</a></li>
+      <li><a href="tutors.html">Tutors</a></li>
+      <li><a href="contact.html">Contact</a></li>
+    </ul>
+  </navigation>
+
+  <main class="auth-page">
+    <section class="auth-panel dashboard-panel">
+      <div class="admin-subnav">
+        <a href="admin-dashboard.html">Overview</a>
+        <a href="admin-reporting.html">Reporting &amp; Oversight</a>
+        <a href="admin-accounts.html">Accounts</a>
+        <a href="admin-assignments.html">Assignments &amp; Resources</a>
+        <a href="admin-matric.html" class="active">Second Chance Programme</a>
+      </div>
+
+      <p><a href="admin-matric.html">&larr; Back to Second Chance Programme</a></p>
+
+      <h2 id="welcomeMessage">Subject</h2>
+      <p class="card-hint">Enrolled students, class slots, and everything shared with this subject's roster, all in one place.</p>
+
+      <div class="dashboard-card">
+        <h3>Enrolled students</h3>
+        <p class="card-hint">Enrolling doesn't require an open class slot — a student can sit "Unscheduled" here until you assign them a time below.</p>
+        <ul id="rosterList"><li>Loading…</li></ul>
+      </div>
+
+      <div class="dashboard-card">
+        <h3>Schedule</h3>
+        <ul id="scheduleList"><li>Loading…</li></ul>
+        <form id="createSlotForm" class="admin-form">
+          <select id="slotDay" required>
+            <option value="1">Monday</option>
+            <option value="2">Tuesday</option>
+            <option value="3">Wednesday</option>
+            <option value="4">Thursday</option>
+          </select>
+          <input id="slotStart" type="time" min="09:00" max="15:00" required />
+          <input id="slotEnd" type="time" min="09:00" max="15:00" required />
+          <select id="slotTutor" required><option value="">Choose a tutor…</option></select>
+          <button type="submit">Create slot</button>
+        </form>
+        <p class="auth-feedback" id="slotFeedback"></p>
+      </div>
+
+      <div class="dashboard-card">
+        <h3>Give a task/assessment to the whole class</h3>
+        <p class="card-hint">Goes to every student currently enrolled in this subject, scheduled or not.</p>
+        <form id="assignForm" class="admin-form">
+          <input id="assignTitle" type="text" placeholder="Title" required />
+          <textarea id="assignDescription" placeholder="Instructions (optional)" rows="2"></textarea>
+          <select id="assignType" required>
+            <option value="task">Task</option>
+            <option value="assessment">Assessment</option>
+          </select>
+          <input id="assignDue" type="datetime-local" required />
+          <button type="submit">Assign to class</button>
+        </form>
+        <p class="auth-feedback" id="assignFeedback"></p>
+      </div>
+
+      <div class="dashboard-card">
+        <h3>Share a study resource with the whole class</h3>
+        <form id="resourceForm" class="admin-form">
+          <input id="resourceTitle" type="text" placeholder="Title" required />
+          <input id="resourceType" type="text" placeholder="Type (e.g. PDF, Link, Worksheet)" required />
+          <input id="resourceUrl" type="url" placeholder="Link (optional)" />
+          <button type="submit">Share with class</button>
+        </form>
+        <p class="auth-feedback" id="resourceFeedback"></p>
+      </div>
+
+      <div class="dashboard-grid dashboard-grid-2">
+        <div class="dashboard-card">
+          <h3>Recent assignments</h3>
+          <ul id="recentAssignmentsList"><li>Loading…</li></ul>
+        </div>
+        <div class="dashboard-card">
+          <h3>Recent resources</h3>
+          <ul id="recentResourcesList"><li>Loading…</li></ul>
+        </div>
+      </div>
+
+      <button id="signOutBtn" type="button">Sign Out</button>
+    </section>
+  </main>
+
+  <footer>
+    <p>&copy; 2023 HelloEducation. All rights reserved.</p>
+  </footer>
+
+  <script type="module">
+    import { initializeApp } from 'https://www.gstatic.com/firebasejs/12.4.0/firebase-app.js';
+    import { getAuth, onAuthStateChanged, signOut } from 'https://www.gstatic.com/firebasejs/12.4.0/firebase-auth.js';
+    import { getFirestore, collection, query, where, orderBy, limit, getDocs, updateDoc, doc, deleteDoc, addDoc, serverTimestamp, writeBatch, arrayRemove, Timestamp } from 'https://www.gstatic.com/firebasejs/12.4.0/firebase-firestore.js';
+    import { firebaseConfig, isFirebaseConfigured } from './firebase-config.js';
+
+    const role = localStorage.getItem('helloEducationRole');
+    if (role !== 'admin') {
+      window.location.href = 'login.html?role=admin';
+    }
+
+    const subject = new URLSearchParams(window.location.search).get('subject');
+    if (!subject) {
+      window.location.href = 'admin-matric.html';
+    }
+
+    const app = initializeApp(firebaseConfig);
+    const auth = getAuth(app);
+    const db = getFirestore(app);
+    const DAY_NAMES = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+
+    function generateMeetingLink() {
+      const slug = crypto.randomUUID().replace(/-/g, '').slice(0, 16);
+      return `https://meet.jit.si/HelloEducation-${slug}`;
+    }
+
+    document.getElementById('pageHeading').textContent = `Second Chance — ${subject}`;
+    document.getElementById('welcomeMessage').textContent = subject;
+
+    const rosterList = document.getElementById('rosterList');
+    const scheduleList = document.getElementById('scheduleList');
+    const createSlotForm = document.getElementById('createSlotForm');
+    const slotTutor = document.getElementById('slotTutor');
+    const slotFeedback = document.getElementById('slotFeedback');
+    const assignForm = document.getElementById('assignForm');
+    const assignFeedback = document.getElementById('assignFeedback');
+    const resourceForm = document.getElementById('resourceForm');
+    const resourceFeedback = document.getElementById('resourceFeedback');
+    const recentAssignmentsList = document.getElementById('recentAssignmentsList');
+    const recentResourcesList = document.getElementById('recentResourcesList');
+    const signOutBtn = document.getElementById('signOutBtn');
+
+    let roster = [];
+    let groups = [];
+
+    function findScheduledGroup(uid) {
+      return groups.find((g) => (g.studentIds || []).includes(uid));
+    }
+
+    async function loadRosterAndSchedule() {
+      const [rosterSnap, groupsSnap] = await Promise.all([
+        getDocs(query(collection(db, 'matricStudents'), where('subjects', 'array-contains', subject))),
+        getDocs(query(collection(db, 'matricGroups'), where('subject', '==', subject)))
+      ]);
+
+      roster = rosterSnap.docs.map((d) => ({ id: d.id, ...d.data() }))
+        .sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+      groups = groupsSnap.docs.map((d) => ({ id: d.id, ...d.data() }))
+        .sort((a, b) => a.dayOfWeek - b.dayOfWeek || a.startTime.localeCompare(b.startTime));
+
+      renderRoster();
+      renderSchedule();
+    }
+
+    function renderRoster() {
+      if (!roster.length) {
+        rosterList.innerHTML = '<li>No students enrolled in this subject yet.</li>';
+        return;
+      }
+
+      const openGroups = groups.filter((g) => (g.studentIds || []).length < (g.capacity || 4));
+
+      rosterList.innerHTML = roster.map((student) => {
+        const group = findScheduledGroup(student.id);
+        const statusBadge = group
+          ? `<span class="status-badge">${DAY_NAMES[group.dayOfWeek]} ${group.startTime}–${group.endTime} (${group.tutorName})</span>`
+          : `<span class="status-badge" style="background:#fef3c7;color:#92400e;">Unscheduled</span>`;
+
+        const assignControls = group
+          ? `<button class="action-btn secondary" data-action="unassign" data-uid="${student.id}" data-group-id="${group.id}" type="button">Unassign</button>`
+          : (openGroups.length
+            ? `<select data-assign-select="${student.id}">${openGroups.map((g) => `<option value="${g.id}">${DAY_NAMES[g.dayOfWeek]} ${g.startTime}–${g.endTime} (${g.tutorName})</option>`).join('')}</select><button class="action-btn" data-action="assign" data-uid="${student.id}" type="button">Assign</button>`
+            : '<span class="card-hint">No open slots</span>');
+
+        return `
+          <li>
+            <div>
+              <strong>${student.name}</strong> — ${student.email}
+              ${statusBadge}
+            </div>
+            <div class="dashboard-actions">
+              ${assignControls}
+              <button class="action-btn secondary" data-action="remove-subject" data-uid="${student.id}" type="button">Remove from subject</button>
+            </div>
+          </li>
+        `;
+      }).join('');
+    }
+
+    function renderSchedule() {
+      scheduleList.innerHTML = groups.length
+        ? groups.map((g) => `
+          <li class="matric-group-item">
+            <div>
+              <strong>${DAY_NAMES[g.dayOfWeek]} ${g.startTime}–${g.endTime}</strong> — Tutor: ${g.tutorName}
+              <span class="status-badge">${(g.studentIds || []).length}/${g.capacity || 4}</span>
+              ${g.meetingLink ? ` — <a href="${g.meetingLink}" target="_blank" rel="noopener">Join session</a>` : ''}
+              <button class="action-btn secondary" data-delete-group="${g.id}" type="button">Delete slot</button>
+            </div>
+          </li>
+        `).join('')
+        : '<li>No class slots yet — create one below.</li>';
+    }
+
+    rosterList.addEventListener('click', async (event) => {
+      const button = event.target.closest('button[data-action]');
+      if (!button) return;
+      const uid = button.dataset.uid;
+      const action = button.dataset.action;
+
+      if (action === 'assign') {
+        const select = rosterList.querySelector(`select[data-assign-select="${uid}"]`);
+        const groupId = select.value;
+        const group = groups.find((g) => g.id === groupId);
+        if (!group || (group.studentIds || []).length >= (group.capacity || 4)) {
+          slotFeedback.textContent = 'That slot filled up — pick another.';
+          await loadRosterAndSchedule();
+          return;
+        }
+        await updateDoc(doc(db, 'matricGroups', groupId), { studentIds: [...(group.studentIds || []), uid] });
+        await loadRosterAndSchedule();
+        return;
+      }
+
+      if (action === 'unassign') {
+        await updateDoc(doc(db, 'matricGroups', button.dataset.groupId), { studentIds: arrayRemove(uid) });
+        await loadRosterAndSchedule();
+        return;
+      }
+
+      if (action === 'remove-subject') {
+        if (!confirm('Remove this student from the subject entirely? This also unassigns them from any class slot for it.')) return;
+        const group = findScheduledGroup(uid);
+        if (group) {
+          await updateDoc(doc(db, 'matricGroups', group.id), { studentIds: arrayRemove(uid) });
+        }
+        await updateDoc(doc(db, 'matricStudents', uid), { subjects: arrayRemove(subject) });
+        await loadRosterAndSchedule();
+      }
+    });
+
+    scheduleList.addEventListener('click', async (event) => {
+      const button = event.target.closest('button[data-delete-group]');
+      if (!button) return;
+      if (!confirm('Delete this class slot? Enrolled students stay enrolled but become unscheduled.')) return;
+      await deleteDoc(doc(db, 'matricGroups', button.dataset.deleteGroup));
+      await loadRosterAndSchedule();
+    });
+
+    async function renderTutorSelect() {
+      const snapshot = await getDocs(collection(db, 'tutors'));
+      slotTutor.innerHTML = '<option value="">Choose a tutor…</option>' + snapshot.docs
+        .map((docSnap) => `<option value="${docSnap.id}" data-name="${docSnap.data().name}">${docSnap.data().name} — ${docSnap.data().subject}</option>`)
+        .join('');
+    }
+
+    createSlotForm.addEventListener('submit', async (event) => {
+      event.preventDefault();
+      slotFeedback.textContent = 'Creating…';
+
+      const dayOfWeek = Number(document.getElementById('slotDay').value);
+      const startTime = document.getElementById('slotStart').value;
+      const endTime = document.getElementById('slotEnd').value;
+      const tutorId = slotTutor.value;
+      const tutorName = slotTutor.options[slotTutor.selectedIndex]?.dataset.name || '';
+
+      if (startTime < '09:00' || endTime > '15:00' || startTime >= endTime) {
+        slotFeedback.textContent = 'Class slots must fall between 9am and 3pm, with a start time before the end time.';
+        return;
+      }
+
+      await addDoc(collection(db, 'matricGroups'), {
+        subject,
+        dayOfWeek,
+        startTime,
+        endTime,
+        tutorId,
+        tutorName,
+        capacity: 4,
+        studentIds: [],
+        meetingLink: generateMeetingLink(),
+        createdAt: serverTimestamp()
+      });
+
+      slotFeedback.textContent = 'Class slot created.';
+      createSlotForm.reset();
+      await loadRosterAndSchedule();
+    });
+
+    assignForm.addEventListener('submit', async (event) => {
+      event.preventDefault();
+
+      if (!roster.length) {
+        assignFeedback.textContent = 'No students enrolled in this subject yet.';
+        return;
+      }
+
+      assignFeedback.textContent = 'Assigning…';
+      const title = document.getElementById('assignTitle').value.trim();
+      const description = document.getElementById('assignDescription').value.trim();
+      const type = document.getElementById('assignType').value;
+      const dueValue = document.getElementById('assignDue').value;
+
+      const batch = writeBatch(db);
+      roster.forEach((student) => {
+        batch.set(doc(collection(db, 'matricAssignments')), {
+          groupId: null,
+          subject,
+          studentId: student.id,
+          studentEmail: student.email || '',
+          title,
+          description,
+          type,
+          dueAt: Timestamp.fromDate(new Date(dueValue)),
+          status: 'assigned',
+          submissionNote: '',
+          fileUrl: null,
+          fileName: null,
+          feedback: '',
+          createdBy: auth.currentUser.uid,
+          createdAt: serverTimestamp()
+        });
+      });
+      await batch.commit();
+
+      assignFeedback.textContent = `Assigned to ${roster.length} student(s).`;
+      assignForm.reset();
+      await renderRecentContent();
+    });
+
+    resourceForm.addEventListener('submit', async (event) => {
+      event.preventDefault();
+
+      if (!roster.length) {
+        resourceFeedback.textContent = 'No students enrolled in this subject yet.';
+        return;
+      }
+
+      resourceFeedback.textContent = 'Sharing…';
+      const title = document.getElementById('resourceTitle').value.trim();
+      const type = document.getElementById('resourceType').value.trim();
+      const url = document.getElementById('resourceUrl').value.trim();
+
+      const batch = writeBatch(db);
+      roster.forEach((student) => {
+        batch.set(doc(collection(db, 'matricStudyResources')), {
+          subject,
+          studentId: student.id,
+          studentEmail: student.email || '',
+          title,
+          type,
+          url: url || null,
+          createdBy: auth.currentUser.uid,
+          createdAt: serverTimestamp()
+        });
+      });
+      await batch.commit();
+
+      resourceFeedback.textContent = `Shared with ${roster.length} student(s).`;
+      resourceForm.reset();
+      await renderRecentContent();
+    });
+
+    async function renderRecentContent() {
+      const [assignmentsSnap, resourcesSnap] = await Promise.all([
+        getDocs(query(collection(db, 'matricAssignments'), where('subject', '==', subject), orderBy('createdAt', 'desc'), limit(15))),
+        getDocs(query(collection(db, 'matricStudyResources'), where('subject', '==', subject), orderBy('createdAt', 'desc'), limit(15)))
+      ]);
+
+      // Fanned-out assignments create one doc per student with the same
+      // title/createdAt — group them back into one line per batch so the
+      // list reads as "what was given", not a wall of duplicates.
+      const seenAssignments = new Set();
+      const assignments = assignmentsSnap.docs
+        .map((d) => d.data())
+        .filter((a) => {
+          const key = `${a.title}|${a.createdAt?.seconds}`;
+          if (seenAssignments.has(key)) return false;
+          seenAssignments.add(key);
+          return true;
+        });
+
+      recentAssignmentsList.innerHTML = assignments.length
+        ? assignments.map((a) => `<li>${a.title} <span class="status-badge">${a.type}</span> — due ${a.dueAt.toDate().toLocaleString()}</li>`).join('')
+        : '<li>Nothing assigned yet.</li>';
+
+      const seenResources = new Set();
+      const resources = resourcesSnap.docs
+        .map((d) => d.data())
+        .filter((r) => {
+          const key = `${r.title}|${r.createdAt?.seconds}`;
+          if (seenResources.has(key)) return false;
+          seenResources.add(key);
+          return true;
+        });
+
+      recentResourcesList.innerHTML = resources.length
+        ? resources.map((r) => `<li>${r.title} <span class="status-badge">${r.type}</span>${r.url ? ` — <a href="${r.url}" target="_blank" rel="noopener">Open</a>` : ''}</li>`).join('')
+        : '<li>Nothing shared yet.</li>';
+    }
+
+    onAuthStateChanged(auth, async (user) => {
+      if (!user && !isFirebaseConfigured()) {
+        return;
+      }
+
+      if (!user) {
+        window.location.href = 'login.html?role=admin';
+        return;
+      }
+
+      renderTutorSelect();
+      loadRosterAndSchedule();
+      renderRecentContent();
+    });
+
+    signOutBtn.addEventListener('click', async () => {
+      if (!isFirebaseConfigured()) {
+        localStorage.removeItem('helloEducationRole');
+        localStorage.removeItem('helloEducationUser');
+        window.location.href = 'login.html?role=admin';
+        return;
+      }
+
+      await signOut(auth);
+    });
+  </script>
+  <script>
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('sw.js').catch(() => {});
+      });
+    }
+  </script>
+</body>
+</html>

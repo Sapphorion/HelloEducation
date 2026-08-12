@@ -180,7 +180,10 @@
         ? allMatricSubjects.map((s) => `
           <li>
             <span>${s.name}</span>
-            <button class="action-btn secondary" data-subject-id="${s.id}" type="button">Remove</button>
+            <div class="dashboard-actions">
+              <a class="action-btn" href="matric-subject.html?subject=${encodeURIComponent(s.name)}">Open subject page</a>
+              <button class="action-btn secondary" data-subject-id="${s.id}" type="button">Remove</button>
+            </div>
           </li>
         `).join('')
         : '<li>No subjects yet — add the NSC subjects your Second Chance students need.</li>';
@@ -315,9 +318,14 @@
 
       try {
         const response = await enrollMatricStudentCallable({ studentId, subject });
-        matricEnrollFeedback.textContent = response.data.alreadyEnrolled
-          ? 'Already enrolled in a class slot for this subject.'
-          : `Enrolled — ${DAY_NAMES[response.data.dayOfWeek]} ${response.data.startTime}–${response.data.endTime} with ${response.data.tutorName}.`;
+        const data = response.data;
+        if (data.alreadyEnrolled && data.scheduled) {
+          matricEnrollFeedback.textContent = 'Already enrolled and scheduled into a class slot for this subject.';
+        } else if (data.scheduled) {
+          matricEnrollFeedback.textContent = `Enrolled — ${DAY_NAMES[data.dayOfWeek]} ${data.startTime}–${data.endTime} with ${data.tutorName}.`;
+        } else {
+          matricEnrollFeedback.textContent = `Enrolled in ${subject} — no open class slot right now, so they're unscheduled for now. Assign them a time from that subject's page.`;
+        }
         matricEnrollForm.reset();
         await renderMatricGroups();
       } catch (error) {

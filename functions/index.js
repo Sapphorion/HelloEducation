@@ -505,32 +505,44 @@ exports.enrollMatricStudent = onCall(async (request) => {
     throw new HttpsError('not-found', 'That Second Chance student was not found.');
   }
 
-  const groupsSnap = await db.collection('matricGroups').where('subject', '==', subject).get();
+  const alreadyEnrolled = (studentDoc.data().subjects || []).includes(subject);
 
-  const alreadyIn = groupsSnap.docs.find((docSnap) => (docSnap.data().studentIds || []).includes(studentId));
-  if (alreadyIn) {
-    return { groupId: alreadyIn.id, alreadyEnrolled: true };
+  const groupsSnap = await db.collection('matricGroups').where('subject', '==', subject).get();
+  const scheduledGroup = groupsSnap.docs.find((docSnap) => (docSnap.data().studentIds || []).includes(studentId));
+
+  if (alreadyEnrolled && scheduledGroup) {
+    return { alreadyEnrolled: true, scheduled: true, groupId: scheduledGroup.id };
   }
 
+  if (!alreadyEnrolled) {
+    await db.doc(`matricStudents/${studentId}`).update({ subjects: FieldValue.arrayUnion(subject) });
+  }
+
+  if (scheduledGroup) {
+    return { alreadyEnrolled, scheduled: true, groupId: scheduledGroup.id };
+  }
+
+  // Enrollment itself never depends on a class slot existing or having
+  // room — it just adds the subject to the student's roster. If an open
+  // slot happens to exist already, opportunistically assign them into it
+  // as a convenience; otherwise they stay enrolled-but-unscheduled until
+  // an admin assigns them a time slot from that subject's page.
   const openGroup = groupsSnap.docs.find((docSnap) => {
     const data = docSnap.data();
     return (data.studentIds || []).length < (data.capacity || 4);
   });
 
   if (!openGroup) {
-    throw new HttpsError(
-      'failed-precondition',
-      `No open class slot for ${subject} — create a new class slot for this subject first, then try again.`
-    );
+    return { alreadyEnrolled, scheduled: false };
   }
 
   await openGroup.ref.update({ studentIds: FieldValue.arrayUnion(studentId) });
-  await db.doc(`matricStudents/${studentId}`).update({ subjects: FieldValue.arrayUnion(subject) });
 
   const groupData = openGroup.data();
   return {
+    alreadyEnrolled,
+    scheduled: true,
     groupId: openGroup.id,
-    subject,
     dayOfWeek: groupData.dayOfWeek,
     startTime: groupData.startTime,
     endTime: groupData.endTime,
