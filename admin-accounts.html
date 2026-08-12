@@ -113,7 +113,7 @@
   <script type="module">
     import { initializeApp } from 'https://www.gstatic.com/firebasejs/12.4.0/firebase-app.js';
     import { getAuth, onAuthStateChanged, signOut } from 'https://www.gstatic.com/firebasejs/12.4.0/firebase-auth.js';
-    import { getFirestore, collection, query, where, getDocs, updateDoc, doc, deleteDoc } from 'https://www.gstatic.com/firebasejs/12.4.0/firebase-firestore.js';
+    import { getFirestore, collection, query, where, getDocs, updateDoc, setDoc, doc, deleteDoc } from 'https://www.gstatic.com/firebasejs/12.4.0/firebase-firestore.js';
     import { getFunctions, httpsCallable } from 'https://www.gstatic.com/firebasejs/12.4.0/firebase-functions.js';
     import { firebaseConfig, isFirebaseConfigured } from './firebase-config.js';
 
@@ -132,6 +132,24 @@
 
     function roleLabel(role) {
       return role === 'matricStudent' ? 'Second Chance student' : role;
+    }
+
+    // Only createAccount (a fresh signup) writes the role-specific profile
+    // doc (tutors/{uid}, students/{uid}, matricStudents/{uid}) as part of
+    // creating the account. Promoting an *existing* account to a new role —
+    // via "Grant a role" or "Save role" below — only ever changed
+    // users/{uid}.role, so the matching profile doc never got created and
+    // the account stayed invisible everywhere that reads that collection
+    // (e.g. the Second Chance enrolment dropdown). merge:true makes this
+    // idempotent and non-destructive if the doc already exists.
+    async function ensureRoleProfileDoc(uid, role, name, email) {
+      if (role === 'tutor') {
+        await setDoc(doc(db, 'tutors', uid), { name, email, subject: '', bio: '', status: 'active' }, { merge: true });
+      } else if (role === 'student') {
+        await setDoc(doc(db, 'students', uid), { name, email, grade: '', status: 'active' }, { merge: true });
+      } else if (role === 'matricStudent') {
+        await setDoc(doc(db, 'matricStudents', uid), { name, email, subjects: [], status: 'active' }, { merge: true });
+      }
     }
 
     const welcomeMessage = document.getElementById('welcomeMessage');
@@ -251,6 +269,8 @@
           updates.childUids = [];
         }
         await updateDoc(doc(db, 'users', uid), updates);
+        const account = allAccounts.find((a) => a.id === uid);
+        await ensureRoleProfileDoc(uid, newRole, account?.name || '', account?.email || '');
         await renderAccountsDirectory();
         await renderTutorDirectory();
         return;
@@ -313,6 +333,7 @@
             updates.childUids = [];
           }
           await updateDoc(doc(db, 'users', userDocSnap.id), updates);
+          await ensureRoleProfileDoc(userDocSnap.id, button.dataset.role, currentData.name || '', currentData.email || '');
           roleLookupResult.innerHTML = `<p>Updated. Current role: <strong>${roleLabel(button.dataset.role)}</strong></p>`;
         });
       });
