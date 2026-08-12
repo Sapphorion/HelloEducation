@@ -78,6 +78,8 @@
             <option value="assessment">Assessment</option>
           </select>
           <input id="assignDue" type="datetime-local" required />
+          <label class="card-hint" for="assignFile">Attach a file (optional, max 10MB)</label>
+          <input id="assignFile" type="file" accept=".pdf,.doc,.docx,.ppt,.pptx,.xls,.xlsx,image/*" />
           <button type="submit">Assign to class</button>
         </form>
         <p class="auth-feedback" id="assignFeedback"></p>
@@ -324,12 +326,23 @@
         return;
       }
 
-      assignFeedback.textContent = 'Assigning…';
       const title = document.getElementById('assignTitle').value.trim();
       const description = document.getElementById('assignDescription').value.trim();
       const type = document.getElementById('assignType').value;
       const dueValue = document.getElementById('assignDue').value;
+      const file = document.getElementById('assignFile').files[0];
 
+      let attachmentUrl = null;
+      let attachmentName = null;
+      if (file) {
+        assignFeedback.textContent = 'Uploading…';
+        const fileRef = ref(storage, `study-resources/${auth.currentUser.uid}/${Date.now()}-${file.name}`);
+        await uploadBytes(fileRef, file);
+        attachmentUrl = await getDownloadURL(fileRef);
+        attachmentName = file.name;
+      }
+
+      assignFeedback.textContent = 'Assigning…';
       const batch = writeBatch(db);
       roster.forEach((student) => {
         batch.set(doc(collection(db, 'matricAssignments')), {
@@ -339,6 +352,8 @@
           studentEmail: student.email || '',
           title,
           description,
+          attachmentUrl,
+          attachmentName,
           type,
           dueAt: Timestamp.fromDate(new Date(dueValue)),
           status: 'assigned',
@@ -418,7 +433,7 @@
         });
 
       recentAssignmentsList.innerHTML = assignments.length
-        ? assignments.map((a) => `<li>${a.title} <span class="status-badge">${a.type}</span> — due ${a.dueAt.toDate().toLocaleString()}</li>`).join('')
+        ? assignments.map((a) => `<li>${a.title} <span class="status-badge">${a.type}</span> — due ${a.dueAt.toDate().toLocaleString()}${a.attachmentUrl ? ` — <a href="${a.attachmentUrl}" target="_blank" rel="noopener">${a.attachmentName || 'View file'}</a>` : ''}</li>`).join('')
         : '<li>Nothing assigned yet.</li>';
 
       const seenResources = new Set();

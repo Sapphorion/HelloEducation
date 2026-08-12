@@ -342,6 +342,7 @@
             <div>
               <strong>${a.title}</strong> <span class="status-badge">${a.status}</span>
               ${a.description ? `<br>${a.description}` : ''}
+              ${a.attachmentUrl ? `<br>Attachment: <a href="${a.attachmentUrl}" target="_blank" rel="noopener">${a.attachmentName || 'View file'}</a>` : ''}
               ${a.status !== 'assigned' ? `<br>Your submission: ${a.submissionNote || '(no note)'}${a.fileUrl ? ` — <a href="${a.fileUrl}" target="_blank" rel="noopener">${a.fileName}</a>` : ''}` : ''}
               ${a.feedback ? `<br>Tutor feedback: ${a.feedback}` : ''}
             </div>

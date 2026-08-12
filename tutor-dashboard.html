@@ -94,6 +94,8 @@
             <input id="assignStudentEmail" type="email" placeholder="Student email" required />
             <input id="assignTitle" type="text" placeholder="Title (e.g. Algebra worksheet)" required />
             <textarea id="assignDescription" placeholder="Instructions (optional)" rows="2"></textarea>
+            <label class="card-hint" for="assignFile">Attach a file (optional, max 10MB)</label>
+            <input id="assignFile" type="file" accept=".pdf,.doc,.docx,.ppt,.pptx,.xls,.xlsx,image/*" />
             <button type="submit">Assign</button>
           </form>
           <p class="auth-feedback" id="assignFeedback"></p>
@@ -164,6 +166,8 @@
               <option value="assessment">Assessment</option>
             </select>
             <input id="matricAssignDue" type="datetime-local" required />
+            <label class="card-hint" for="matricAssignFile">Attach a file (optional, max 10MB)</label>
+            <input id="matricAssignFile" type="file" accept=".pdf,.doc,.docx,.ppt,.pptx,.xls,.xlsx,image/*" />
             <button type="submit">Assign</button>
           </form>
           <p class="auth-feedback" id="matricAssignFeedback"></p>
@@ -181,6 +185,8 @@
           <input id="matricResourceTitle" type="text" placeholder="Title (e.g. Maths formula sheet)" required />
           <input id="matricResourceType" type="text" placeholder="Type (e.g. PDF, Link, Worksheet)" required />
           <input id="matricResourceUrl" type="url" placeholder="Link (optional)" />
+          <label class="card-hint" for="matricResourceFile">Or upload a file (PDF, Word, PowerPoint, image — max 10MB)</label>
+          <input id="matricResourceFile" type="file" accept=".pdf,.doc,.docx,.ppt,.pptx,.xls,.xlsx,image/*" />
           <button type="submit">Share</button>
         </form>
         <p class="auth-feedback" id="matricResourceFeedback"></p>
@@ -315,7 +321,8 @@
       const studentEmail = document.getElementById('matricResourceStudentEmail').value.trim();
       const title = document.getElementById('matricResourceTitle').value.trim();
       const type = document.getElementById('matricResourceType').value.trim();
-      const url = document.getElementById('matricResourceUrl').value.trim();
+      let url = document.getElementById('matricResourceUrl').value.trim();
+      const file = document.getElementById('matricResourceFile').files[0];
 
       const studentQuery = query(collection(db, 'matricStudents'), where('email', '==', studentEmail));
       const studentSnap = await getDocs(studentQuery);
@@ -323,6 +330,13 @@
       if (studentSnap.empty) {
         matricResourceFeedback.textContent = 'No Second Chance student found with that email.';
         return;
+      }
+
+      if (file) {
+        matricResourceFeedback.textContent = 'Uploading…';
+        const fileRef = ref(storage, `study-resources/${auth.currentUser.uid}/${Date.now()}-${file.name}`);
+        await uploadBytes(fileRef, file);
+        url = await getDownloadURL(fileRef);
       }
 
       await addDoc(collection(db, 'matricStudyResources'), {
@@ -449,6 +463,17 @@
         return;
       }
 
+      const file = document.getElementById('matricAssignFile').files[0];
+      let attachmentUrl = null;
+      let attachmentName = null;
+      if (file) {
+        matricAssignFeedback.textContent = 'Uploading…';
+        const fileRef = ref(storage, `study-resources/${auth.currentUser.uid}/${Date.now()}-${file.name}`);
+        await uploadBytes(fileRef, file);
+        attachmentUrl = await getDownloadURL(fileRef);
+        attachmentName = file.name;
+      }
+
       const batch = writeBatch(db);
       group.studentIds.forEach((studentId) => {
         const student = matricStudentById[studentId];
@@ -459,6 +484,8 @@
           studentEmail: student ? student.email : '',
           title,
           description,
+          attachmentUrl,
+          attachmentName,
           type,
           dueAt: Timestamp.fromDate(new Date(dueValue)),
           status: 'assigned',
@@ -490,6 +517,7 @@
           <li>
             <strong>${a.title}</strong> — ${a.studentEmail || 'Student'} <span class="status-badge">${a.type}</span> <span class="status-badge">${a.status}</span>
             ${a.dueAt ? `<br>Due: ${a.dueAt.toDate().toLocaleString()}` : ''}
+            ${a.attachmentUrl ? `<br>Attachment: <a href="${a.attachmentUrl}" target="_blank" rel="noopener">${a.attachmentName || 'View file'}</a>` : ''}
             ${a.status !== 'assigned' ? `<br>Submission: ${a.submissionNote || '(no note)'}${a.fileUrl ? ` — <a href="${a.fileUrl}" target="_blank" rel="noopener">${a.fileName}</a>` : ''}` : ''}
           </li>
         `).join('')
@@ -512,6 +540,7 @@
             <div>
               <strong>${a.title}</strong> — ${a.studentEmail || 'Student'} <span class="status-badge">${a.status}</span>
               ${a.description ? `<br>${a.description}` : ''}
+              ${a.attachmentUrl ? `<br>Attachment: <a href="${a.attachmentUrl}" target="_blank" rel="noopener">${a.attachmentName || 'View file'}</a>` : ''}
               ${a.status !== 'assigned' ? `<br>Submission: ${a.submissionNote || '(no note)'}${a.fileUrl ? ` — <a href="${a.fileUrl}" target="_blank" rel="noopener">${a.fileName || 'View file'}</a>` : ''}` : ''}
               ${a.feedback ? `<br>Your feedback: ${a.feedback}` : ''}
             </div>
@@ -533,6 +562,7 @@
       const studentEmail = document.getElementById('assignStudentEmail').value.trim();
       const title = document.getElementById('assignTitle').value.trim();
       const description = document.getElementById('assignDescription').value.trim();
+      const file = document.getElementById('assignFile').files[0];
 
       const studentQuery = query(collection(db, 'users'), where('email', '==', studentEmail), where('role', '==', 'student'));
       const studentSnap = await getDocs(studentQuery);
@@ -542,11 +572,23 @@
         return;
       }
 
+      let attachmentUrl = null;
+      let attachmentName = null;
+      if (file) {
+        assignFeedback.textContent = 'Uploading…';
+        const fileRef = ref(storage, `study-resources/${auth.currentUser.uid}/${Date.now()}-${file.name}`);
+        await uploadBytes(fileRef, file);
+        attachmentUrl = await getDownloadURL(fileRef);
+        attachmentName = file.name;
+      }
+
       await addDoc(collection(db, 'assignments'), {
         studentId: studentSnap.docs[0].id,
         studentEmail,
         title,
         description,
+        attachmentUrl,
+        attachmentName,
         status: 'assigned',
         submissionNote: '',
         fileUrl: null,
