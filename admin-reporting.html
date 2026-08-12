@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>HelloEducation Admin — Reporting &amp; Oversight</title>
+  <link rel="stylesheet" href="styling.css" />
+  <link rel="manifest" href="manifest.json" />
+  <link rel="icon" href="favicon.ico" />
+  <link rel="apple-touch-icon" href="icons/apple-touch-icon.png" />
+  <meta name="theme-color" content="#3074f3" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="HelloEducation" />
+</head>
+<body>
+  <header>
+    <h1>HelloEducation</h1>
+    <h1 class="page-heading">Admin — Reporting &amp; Oversight</h1>
+  </header>
+
+  <navigation>
+    <ul>
+      <li><a href="index.html">Home</a></li>
+      <li><a href="services.html">Services</a></li>
+      <li><a href="tutors.html">Tutors</a></li>
+      <li><a href="contact.html">Contact</a></li>
+    </ul>
+  </navigation>
+
+  <main class="auth-page">
+    <section class="auth-panel dashboard-panel">
+      <div class="admin-subnav">
+        <a href="admin-dashboard.html">Overview</a>
+        <a href="admin-reporting.html" class="active">Reporting &amp; Oversight</a>
+        <a href="admin-accounts.html">Accounts</a>
+        <a href="admin-assignments.html">Assignments &amp; Resources</a>
+        <a href="admin-matric.html">Second Chance Programme</a>
+      </div>
+
+      <h2 id="welcomeMessage">Reporting &amp; Oversight</h2>
+      <p id="summaryText">Platform stats, upcoming sessions, and inactive tutors.</p>
+
+      <div class="dashboard-card">
+        <h3>Reporting &amp; oversight</h3>
+        <div class="auth-tabs report-tabs" role="tablist" aria-label="Reporting view">
+          <button class="auth-tab active" type="button" data-report-tab="overview">Overview</button>
+          <button class="auth-tab" type="button" data-report-tab="upcoming">Upcoming Sessions</button>
+          <button class="auth-tab" type="button" data-report-tab="inactive">Inactive Tutors</button>
+        </div>
+
+        <div class="report-panel" data-report-panel="overview">
+          <div id="roleStatTiles" class="stat-tile-row"></div>
+          <div id="sessionStatTiles" class="stat-tile-row"></div>
+        </div>
+        <div class="report-panel" data-report-panel="upcoming" hidden>
+          <ul id="upcomingReportList"><li>Loading…</li></ul>
+        </div>
+        <div class="report-panel" data-report-panel="inactive" hidden>
+          <ul id="inactiveTutorsList"><li>Loading…</li></ul>
+        </div>
+      </div>
+
+      <button id="signOutBtn" type="button">Sign Out</button>
+    </section>
+  </main>
+
+  <footer>
+    <p>&copy; 2023 HelloEducation. All rights reserved.</p>
+  </footer>
+
+  <script type="module">
+    import { initializeApp } from 'https://www.gstatic.com/firebasejs/12.4.0/firebase-app.js';
+    import { getAuth, onAuthStateChanged, signOut } from 'https://www.gstatic.com/firebasejs/12.4.0/firebase-auth.js';
+    import { getFirestore, collection, getDocs } from 'https://www.gstatic.com/firebasejs/12.4.0/firebase-firestore.js';
+    import { firebaseConfig, isFirebaseConfigured } from './firebase-config.js';
+
+    const role = localStorage.getItem('helloEducationRole');
+    if (role !== 'admin') {
+      window.location.href = 'login.html?role=admin';
+    }
+
+    const app = initializeApp(firebaseConfig);
+    const auth = getAuth(app);
+    const db = getFirestore(app);
+    const welcomeMessage = document.getElementById('welcomeMessage');
+    const summaryText = document.getElementById('summaryText');
+    const signOutBtn = document.getElementById('signOutBtn');
+    const roleStatTiles = document.getElementById('roleStatTiles');
+    const sessionStatTiles = document.getElementById('sessionStatTiles');
+    const upcomingReportList = document.getElementById('upcomingReportList');
+    const inactiveTutorsList = document.getElementById('inactiveTutorsList');
+
+    document.querySelectorAll('[data-report-tab]').forEach((tabButton) => {
+      tabButton.addEventListener('click', () => {
+        document.querySelectorAll('[data-report-tab]').forEach((btn) => btn.classList.toggle('active', btn === tabButton));
+        document.querySelectorAll('[data-report-panel]').forEach((panel) => {
+          panel.hidden = panel.dataset.reportPanel !== tabButton.dataset.reportTab;
+        });
+      });
+    });
+
+    async function renderReporting() {
+      const [usersSnap, sessionsSnap, tutorsSnap] = await Promise.all([
+        getDocs(collection(db, 'users')),
+        getDocs(collection(db, 'sessions')),
+        getDocs(collection(db, 'tutors'))
+      ]);
+
+      const users = usersSnap.docs.map((d) => d.data());
+      const sessions = sessionsSnap.docs.map((d) => d.data());
+      const tutors = tutorsSnap.docs.map((d) => ({ id: d.id, ...d.data() }));
+
+      const roleCounts = { student: 0, tutor: 0, parent: 0, admin: 0, matricStudent: 0 };
+      users.forEach((u) => { if (roleCounts[u.role] !== undefined) roleCounts[u.role]++; });
+
+      roleStatTiles.innerHTML = `
+        <div class="stat-tile"><span class="stat-value">${roleCounts.student}</span><span class="stat-label">Students</span></div>
+        <div class="stat-tile"><span class="stat-value">${roleCounts.tutor}</span><span class="stat-label">Tutors</span></div>
+        <div class="stat-tile"><span class="stat-value">${roleCounts.parent}</span><span class="stat-label">Parents</span></div>
+        <div class="stat-tile"><span class="stat-value">${roleCounts.matricStudent}</span><span class="stat-label">Second Chance students</span></div>
+        <div class="stat-tile"><span class="stat-value">${roleCounts.admin}</span><span class="stat-label">Admins</span></div>
+      `;
+
+      const statusCounts = { pending: 0, scheduled: 0, completed: 0, cancelled: 0 };
+      sessions.forEach((s) => { if (statusCounts[s.status] !== undefined) statusCounts[s.status]++; });
+
+      sessionStatTiles.innerHTML = `
+        <div class="stat-tile stat-tile-warning"><span class="stat-value">${statusCounts.pending}</span><span class="stat-label">Pending requests</span></div>
+        <div class="stat-tile stat-tile-good"><span class="stat-value">${statusCounts.scheduled}</span><span class="stat-label">Scheduled sessions</span></div>
+        <div class="stat-tile stat-tile-neutral"><span class="stat-value">${statusCounts.completed}</span><span class="stat-label">Completed sessions</span></div>
+        <div class="stat-tile stat-tile-critical"><span class="stat-value">${statusCounts.cancelled}</span><span class="stat-label">Cancelled/declined</span></div>
+      `;
+
+      const tutorNameById = Object.fromEntries(tutors.map((t) => [t.id, t.name]));
+      const now = new Date();
+      const weekFromNow = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
+      const upcoming = sessions
+        .filter((s) => s.status === 'scheduled' && s.scheduledAt && s.scheduledAt.toDate() >= now && s.scheduledAt.toDate() <= weekFromNow)
+        .sort((a, b) => a.scheduledAt.toDate() - b.scheduledAt.toDate());
+
+      upcomingReportList.innerHTML = upcoming.length
+        ? upcoming.map((s) => `<li>${s.studentEmail || 'Student'} with ${tutorNameById[s.tutorId] || 'tutor'} — ${s.subject} — ${s.scheduledAt.toDate().toLocaleString()} <span class="status-badge">${s.format === 'faceToFace' ? 'Face-to-face' : 'Online'}</span>${s.meetingLink ? ` — <a href="${s.meetingLink}" target="_blank" rel="noopener">Join session</a>` : ''}</li>`).join('')
+        : '<li>Nothing scheduled in the next 7 days.</li>';
+
+      const tutorSessionCounts = {};
+      sessions.forEach((s) => { tutorSessionCounts[s.tutorId] = (tutorSessionCounts[s.tutorId] || 0) + 1; });
+      const inactiveTutors = tutors.filter((t) => !tutorSessionCounts[t.id]);
+
+      inactiveTutorsList.innerHTML = inactiveTutors.length
+        ? inactiveTutors.map((t) => `<li>${t.name} — ${t.email}</li>`).join('')
+        : '<li>Every tutor has at least one session logged.</li>';
+    }
+
+    onAuthStateChanged(auth, async (user) => {
+      if (!user && !isFirebaseConfigured()) {
+        welcomeMessage.textContent = 'Reporting & Oversight';
+        summaryText.textContent = 'Demo mode is active. Connect Firebase to see real data.';
+        return;
+      }
+
+      if (!user) {
+        window.location.href = 'login.html?role=admin';
+        return;
+      }
+
+      renderReporting();
+    });
+
+    signOutBtn.addEventListener('click', async () => {
+      if (!isFirebaseConfigured()) {
+        localStorage.removeItem('helloEducationRole');
+        localStorage.removeItem('helloEducationUser');
+        window.location.href = 'login.html?role=admin';
+        return;
+      }
+
+      await signOut(auth);
+    });
+  </script>
+  <script>
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('sw.js').catch(() => {});
+      });
+    }
+  </script>
+</body>
+</html>

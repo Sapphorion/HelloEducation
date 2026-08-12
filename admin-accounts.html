@@ -1,0 +1,422 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>HelloEducation Admin — Accounts</title>
+  <link rel="stylesheet" href="styling.css" />
+  <link rel="manifest" href="manifest.json" />
+  <link rel="icon" href="favicon.ico" />
+  <link rel="apple-touch-icon" href="icons/apple-touch-icon.png" />
+  <meta name="theme-color" content="#3074f3" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="HelloEducation" />
+</head>
+<body>
+  <header>
+    <h1>HelloEducation</h1>
+    <h1 class="page-heading">Admin — Accounts</h1>
+  </header>
+
+  <navigation>
+    <ul>
+      <li><a href="index.html">Home</a></li>
+      <li><a href="services.html">Services</a></li>
+      <li><a href="tutors.html">Tutors</a></li>
+      <li><a href="contact.html">Contact</a></li>
+    </ul>
+  </navigation>
+
+  <main class="auth-page">
+    <section class="auth-panel dashboard-panel">
+      <div class="admin-subnav">
+        <a href="admin-dashboard.html">Overview</a>
+        <a href="admin-reporting.html">Reporting &amp; Oversight</a>
+        <a href="admin-accounts.html" class="active">Accounts</a>
+        <a href="admin-assignments.html">Assignments &amp; Resources</a>
+        <a href="admin-matric.html">Second Chance Programme</a>
+      </div>
+
+      <h2 id="welcomeMessage">Accounts</h2>
+      <p id="summaryText">Create accounts, grant roles, and manage every account on the platform.</p>
+
+      <div class="dashboard-grid dashboard-grid-2">
+        <div class="dashboard-card">
+          <h3>Grant a role</h3>
+          <p class="card-hint">Look up a signed-up account by email, then promote it to tutor or admin. New accounts start as students until you do this.</p>
+          <form id="roleLookupForm" class="admin-form">
+            <input id="roleLookupEmail" type="email" placeholder="Account email" required />
+            <button type="submit">Look up</button>
+          </form>
+          <div id="roleLookupResult" class="admin-result"></div>
+        </div>
+        <div class="dashboard-card">
+          <h3>Create an account</h3>
+          <p class="card-hint">Creates their login and profile in one step. Leave the password blank to auto-generate a temporary one to share with them.</p>
+          <form id="createAccountForm" class="admin-form">
+            <select id="newAccountRole" required>
+              <option value="student">Student</option>
+              <option value="tutor">Tutor</option>
+              <option value="parent">Parent</option>
+              <option value="matricStudent">Second Chance Student</option>
+              <option value="admin">Admin</option>
+            </select>
+            <input id="newAccountName" type="text" placeholder="Name" required />
+            <input id="newAccountEmail" type="email" placeholder="Email" required />
+            <input id="newAccountPassword" type="password" placeholder="Password (optional — auto-generated if blank)" />
+            <input id="newAccountSubject" type="text" placeholder="Subject" class="tutor-only" />
+            <textarea id="newAccountBio" placeholder="Short bio" rows="2" class="tutor-only"></textarea>
+            <input id="newAccountGrade" type="text" placeholder="Grade" class="student-only" />
+            <input id="newAccountChildren" type="text" placeholder="Linked student email(s), comma-separated" class="parent-only" />
+            <button type="submit">Create account</button>
+          </form>
+          <p class="card-hint">Account creation takes a few seconds — it creates the sign-in, writes their profile, and sends a welcome email in sequence, so the button doesn't feel instant. That's normal.</p>
+          <div class="admin-result" id="createAccountResult"></div>
+        </div>
+      </div>
+
+      <div class="dashboard-card">
+        <h3>Current tutors</h3>
+        <ul id="tutorDirectory"><li>Loading…</li></ul>
+      </div>
+
+      <div class="dashboard-card">
+        <h3>All accounts</h3>
+        <p class="card-hint">Every account on the platform. Change a role, disable sign-in without losing their data, or permanently delete an account.</p>
+        <div class="accounts-filter">
+          <input id="accountsSearch" type="text" placeholder="Search name or email…" />
+          <select id="accountsRoleFilter">
+            <option value="">All roles</option>
+            <option value="student">Student</option>
+            <option value="tutor">Tutor</option>
+            <option value="parent">Parent</option>
+            <option value="matricStudent">Second Chance Student</option>
+            <option value="admin">Admin</option>
+          </select>
+          <label class="accounts-filter-checkbox">
+            <input id="accountsDisabledFilter" type="checkbox" />
+            Disabled only
+          </label>
+        </div>
+        <ul id="accountsDirectory" class="accounts-directory"><li>Loading…</li></ul>
+      </div>
+
+      <button id="signOutBtn" type="button">Sign Out</button>
+    </section>
+  </main>
+
+  <footer>
+    <p>&copy; 2023 HelloEducation. All rights reserved.</p>
+  </footer>
+
+  <script type="module">
+    import { initializeApp } from 'https://www.gstatic.com/firebasejs/12.4.0/firebase-app.js';
+    import { getAuth, onAuthStateChanged, signOut } from 'https://www.gstatic.com/firebasejs/12.4.0/firebase-auth.js';
+    import { getFirestore, collection, query, where, getDocs, updateDoc, doc, deleteDoc } from 'https://www.gstatic.com/firebasejs/12.4.0/firebase-firestore.js';
+    import { getFunctions, httpsCallable } from 'https://www.gstatic.com/firebasejs/12.4.0/firebase-functions.js';
+    import { firebaseConfig, isFirebaseConfigured } from './firebase-config.js';
+
+    const role = localStorage.getItem('helloEducationRole');
+    if (role !== 'admin') {
+      window.location.href = 'login.html?role=admin';
+    }
+
+    const app = initializeApp(firebaseConfig);
+    const auth = getAuth(app);
+    const db = getFirestore(app);
+    const functions = getFunctions(app);
+    const createAccountCallable = httpsCallable(functions, 'createAccount');
+    const setAccountDisabledCallable = httpsCallable(functions, 'setAccountDisabled');
+    const deleteAccountCallable = httpsCallable(functions, 'deleteAccount');
+
+    function roleLabel(role) {
+      return role === 'matricStudent' ? 'Second Chance student' : role;
+    }
+
+    const welcomeMessage = document.getElementById('welcomeMessage');
+    const summaryText = document.getElementById('summaryText');
+    const signOutBtn = document.getElementById('signOutBtn');
+    const roleLookupForm = document.getElementById('roleLookupForm');
+    const roleLookupResult = document.getElementById('roleLookupResult');
+    const createAccountForm = document.getElementById('createAccountForm');
+    const createAccountResult = document.getElementById('createAccountResult');
+    const newAccountRole = document.getElementById('newAccountRole');
+    const tutorDirectory = document.getElementById('tutorDirectory');
+    const accountsDirectory = document.getElementById('accountsDirectory');
+    const accountsSearch = document.getElementById('accountsSearch');
+    const accountsRoleFilter = document.getElementById('accountsRoleFilter');
+    const accountsDisabledFilter = document.getElementById('accountsDisabledFilter');
+    const ROLE_ORDER = ['admin', 'tutor', 'parent', 'student', 'matricStudent'];
+
+    function updateRoleFields() {
+      const role = newAccountRole.value;
+      document.querySelectorAll('.tutor-only').forEach((el) => { el.style.display = role === 'tutor' ? '' : 'none'; });
+      document.querySelectorAll('.student-only').forEach((el) => { el.style.display = role === 'student' ? '' : 'none'; });
+      document.querySelectorAll('.parent-only').forEach((el) => { el.style.display = role === 'parent' ? '' : 'none'; });
+    }
+    newAccountRole.addEventListener('change', updateRoleFields);
+    updateRoleFields();
+
+    async function renderTutorDirectory() {
+      const snapshot = await getDocs(collection(db, 'tutors'));
+      if (snapshot.empty) {
+        tutorDirectory.innerHTML = '<li>No tutor profiles yet.</li>';
+        return;
+      }
+      tutorDirectory.innerHTML = snapshot.docs.map((docSnap) => {
+        const tutor = docSnap.data();
+        return `
+          <li>
+            <span>${tutor.name} — ${tutor.subject}</span>
+            <button class="action-btn secondary" data-tutor-id="${docSnap.id}" type="button">Remove</button>
+          </li>
+        `;
+      }).join('');
+    }
+
+    let allAccounts = [];
+
+    async function renderAccountsDirectory() {
+      const snapshot = await getDocs(collection(db, 'users'));
+      allAccounts = snapshot.docs
+        .map((docSnap) => ({ id: docSnap.id, ...docSnap.data() }))
+        .sort((a, b) => ROLE_ORDER.indexOf(a.role) - ROLE_ORDER.indexOf(b.role) || (a.name || '').localeCompare(b.name || ''));
+      renderFilteredAccounts();
+    }
+
+    function renderFilteredAccounts() {
+      const search = accountsSearch.value.trim().toLowerCase();
+      const roleFilter = accountsRoleFilter.value;
+      const disabledOnly = accountsDisabledFilter.checked;
+
+      const accounts = allAccounts.filter((account) => {
+        if (roleFilter && account.role !== roleFilter) return false;
+        if (disabledOnly && !account.disabled) return false;
+        if (search) {
+          const haystack = `${account.name || ''} ${account.email || ''}`.toLowerCase();
+          if (!haystack.includes(search)) return false;
+        }
+        return true;
+      });
+
+      if (!accounts.length) {
+        accountsDirectory.innerHTML = `<li>${allAccounts.length ? 'No accounts match this filter.' : 'No accounts yet.'}</li>`;
+        return;
+      }
+
+      const currentUid = auth.currentUser ? auth.currentUser.uid : null;
+
+      accountsDirectory.innerHTML = accounts.map((account) => {
+        const isSelf = account.id === currentUid;
+        const disabledBadge = account.disabled ? ' <span class="status-badge" style="background:#fee2e2;color:#b91c1c;">disabled</span>' : '';
+        const roleOptions = ['student', 'tutor', 'parent', 'matricStudent', 'admin']
+          .map((r) => `<option value="${r}" ${r === account.role ? 'selected' : ''}>${roleLabel(r)}</option>`)
+          .join('');
+
+        return `
+          <li>
+            <div>
+              <strong>${account.name || '(no name)'}</strong> — ${account.email}
+              <span class="status-badge">${roleLabel(account.role)}</span>${disabledBadge}${isSelf ? ' (you)' : ''}
+            </div>
+            ${isSelf ? '' : `
+              <div class="dashboard-actions">
+                <select data-uid="${account.id}" class="directory-role-select">${roleOptions}</select>
+                <button class="action-btn" data-action="save-role" data-uid="${account.id}" type="button">Save role</button>
+                <button class="action-btn secondary" data-action="toggle-disabled" data-uid="${account.id}" data-disabled="${Boolean(account.disabled)}" type="button">${account.disabled ? 'Enable' : 'Disable'}</button>
+                <button class="action-btn secondary" data-action="delete" data-uid="${account.id}" type="button">Delete</button>
+              </div>
+            `}
+          </li>
+        `;
+      }).join('');
+    }
+
+    accountsSearch.addEventListener('input', renderFilteredAccounts);
+    accountsRoleFilter.addEventListener('change', renderFilteredAccounts);
+    accountsDisabledFilter.addEventListener('change', renderFilteredAccounts);
+
+    accountsDirectory.addEventListener('click', async (event) => {
+      const button = event.target.closest('button[data-action]');
+      if (!button) return;
+      const uid = button.dataset.uid;
+      const action = button.dataset.action;
+
+      if (action === 'save-role') {
+        const select = accountsDirectory.querySelector(`select[data-uid="${uid}"]`);
+        const newRole = select.value;
+        const updates = { role: newRole };
+        if (newRole !== 'parent') {
+          updates.childUids = [];
+        }
+        await updateDoc(doc(db, 'users', uid), updates);
+        await renderAccountsDirectory();
+        await renderTutorDirectory();
+        return;
+      }
+
+      if (action === 'toggle-disabled') {
+        const nextDisabled = button.dataset.disabled !== 'true';
+        await setAccountDisabledCallable({ uid, disabled: nextDisabled });
+        await renderAccountsDirectory();
+        return;
+      }
+
+      if (action === 'delete') {
+        const li = button.closest('li');
+        const label = li.querySelector('strong')?.textContent || 'this account';
+        if (!confirm(`Permanently delete ${label}? This can't be undone.`)) return;
+        await deleteAccountCallable({ uid });
+        await renderAccountsDirectory();
+        await renderTutorDirectory();
+      }
+    });
+
+    roleLookupForm.addEventListener('submit', async (event) => {
+      event.preventDefault();
+      const email = document.getElementById('roleLookupEmail').value.trim();
+      roleLookupResult.innerHTML = 'Searching…';
+
+      const usersQuery = query(collection(db, 'users'), where('email', '==', email));
+      const snapshot = await getDocs(usersQuery);
+
+      if (snapshot.empty) {
+        roleLookupResult.innerHTML = 'No account found with that email. They need to sign in on the Student tab at least once first.';
+        return;
+      }
+
+      const userDocSnap = snapshot.docs[0];
+      const currentData = userDocSnap.data();
+
+      roleLookupResult.innerHTML = `
+        <p>Current role: <strong>${roleLabel(currentData.role)}</strong></p>
+        <div class="dashboard-actions">
+          <button class="action-btn" data-role="student" type="button">Set student</button>
+          <button class="action-btn" data-role="tutor" type="button">Set tutor</button>
+          <button class="action-btn" data-role="parent" type="button">Set parent</button>
+          <button class="action-btn" data-role="matricStudent" type="button">Set Second Chance student</button>
+          <button class="action-btn" data-role="admin" type="button">Set admin</button>
+        </div>
+        ${currentData.role === 'parent' ? `
+          <form id="editChildrenForm" class="admin-form">
+            <input id="editChildrenEmails" type="text" placeholder="Linked student email(s), comma-separated" value="" />
+            <button type="submit">Update linked children</button>
+          </form>
+        ` : ''}
+      `;
+
+      roleLookupResult.querySelectorAll('button[data-role]').forEach((button) => {
+        button.addEventListener('click', async () => {
+          const updates = { role: button.dataset.role };
+          if (button.dataset.role !== 'parent') {
+            updates.childUids = [];
+          }
+          await updateDoc(doc(db, 'users', userDocSnap.id), updates);
+          roleLookupResult.innerHTML = `<p>Updated. Current role: <strong>${roleLabel(button.dataset.role)}</strong></p>`;
+        });
+      });
+
+      const editChildrenForm = document.getElementById('editChildrenForm');
+      if (editChildrenForm) {
+        editChildrenForm.addEventListener('submit', async (event) => {
+          event.preventDefault();
+          const emails = document.getElementById('editChildrenEmails').value
+            .split(',').map((e) => e.trim()).filter(Boolean);
+
+          const childUids = [];
+          const notFound = [];
+          for (const childEmail of emails) {
+            const childQuery = query(collection(db, 'users'), where('email', '==', childEmail), where('role', '==', 'student'));
+            const childSnap = await getDocs(childQuery);
+            if (childSnap.empty) {
+              notFound.push(childEmail);
+            } else {
+              childUids.push(childSnap.docs[0].id);
+            }
+          }
+
+          await updateDoc(doc(db, 'users', userDocSnap.id), { childUids });
+          roleLookupResult.innerHTML = `<p>Linked ${childUids.length} student(s).${notFound.length ? ` Not found: ${notFound.join(', ')}` : ''}</p>`;
+        });
+      }
+    });
+
+    createAccountForm.addEventListener('submit', async (event) => {
+      event.preventDefault();
+      createAccountResult.innerHTML = 'Creating account…';
+
+      const role = newAccountRole.value;
+      const name = document.getElementById('newAccountName').value.trim();
+      const email = document.getElementById('newAccountEmail').value.trim();
+      const password = document.getElementById('newAccountPassword').value;
+      const subject = document.getElementById('newAccountSubject').value.trim();
+      const bio = document.getElementById('newAccountBio').value.trim();
+      const grade = document.getElementById('newAccountGrade').value.trim();
+      const childEmails = document.getElementById('newAccountChildren').value
+        .split(',').map((e) => e.trim()).filter(Boolean);
+
+      try {
+        const response = await createAccountCallable({ email, password, name, role, subject, bio, grade, childEmails });
+        const data = response.data;
+        let message = data.tempPassword
+          ? `<p>Created ${data.email} as ${roleLabel(data.role)}.</p><p>Temporary password: <strong>${data.tempPassword}</strong> — share this with them securely, it won't be shown again.</p>`
+          : `<p>Created ${data.email} as ${roleLabel(data.role)}.</p>`;
+        if (data.role === 'parent') {
+          message += `<p>Linked ${data.childrenLinked || 0} student(s).${data.childEmailsNotFound ? ` Not found: ${data.childEmailsNotFound.join(', ')}` : ''}</p>`;
+        }
+        createAccountResult.innerHTML = message;
+        createAccountForm.reset();
+        updateRoleFields();
+        if (role === 'tutor') {
+          await renderTutorDirectory();
+        }
+        await renderAccountsDirectory();
+      } catch (error) {
+        createAccountResult.innerHTML = `<p>${error.message || 'Could not create the account.'}</p>`;
+      }
+    });
+
+    tutorDirectory.addEventListener('click', async (event) => {
+      const button = event.target.closest('button[data-tutor-id]');
+      if (!button) return;
+      await deleteDoc(doc(db, 'tutors', button.dataset.tutorId));
+      await renderTutorDirectory();
+    });
+
+    onAuthStateChanged(auth, async (user) => {
+      if (!user && !isFirebaseConfigured()) {
+        welcomeMessage.textContent = 'Accounts';
+        summaryText.textContent = 'Demo mode is active. Connect Firebase to enable full admin control.';
+        return;
+      }
+
+      if (!user) {
+        window.location.href = 'login.html?role=admin';
+        return;
+      }
+
+      renderTutorDirectory();
+      renderAccountsDirectory();
+    });
+
+    signOutBtn.addEventListener('click', async () => {
+      if (!isFirebaseConfigured()) {
+        localStorage.removeItem('helloEducationRole');
+        localStorage.removeItem('helloEducationUser');
+        window.location.href = 'login.html?role=admin';
+        return;
+      }
+
+      await signOut(auth);
+    });
+  </script>
+  <script>
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('sw.js').catch(() => {});
+      });
+    }
+  </script>
+</body>
+</html>
