@@ -75,46 +75,18 @@
         <ul id="matricGroupsList"><li>Loading…</li></ul>
       </div>
 
-      <div class="dashboard-grid dashboard-grid-2">
-        <div class="dashboard-card">
-          <h3>Enrol a student in a subject</h3>
-          <p class="card-hint">Auto-assigns them into an open class slot for that subject.</p>
-          <form id="matricEnrollForm" class="admin-form">
-            <select id="matricEnrollStudent" required><option value="">Choose a matric student…</option></select>
-            <select id="matricEnrollSubject" required><option value="">Choose a subject…</option></select>
-            <button type="submit">Enrol</button>
-          </form>
-          <p class="auth-feedback" id="matricEnrollFeedback"></p>
-        </div>
-        <div class="dashboard-card">
-          <h3>Give a task/assessment</h3>
-          <p class="card-hint">Assigns to every student in the chosen class slot.</p>
-          <form id="matricAssignForm" class="admin-form">
-            <select id="matricAssignGroup" required><option value="">Choose a class slot…</option></select>
-            <input id="matricAssignTitle" type="text" placeholder="Title" required />
-            <textarea id="matricAssignDescription" placeholder="Instructions (optional)" rows="2"></textarea>
-            <select id="matricAssignType" required>
-              <option value="task">Task</option>
-              <option value="assessment">Assessment</option>
-            </select>
-            <input id="matricAssignDue" type="datetime-local" required />
-            <button type="submit">Assign</button>
-          </form>
-          <p class="auth-feedback" id="matricAssignFeedback"></p>
-        </div>
+      <div class="dashboard-card">
+        <h3>Enrol a student in a subject</h3>
+        <p class="card-hint">Adds them to that subject's roster right away — no open class slot needed. Auto-assigns them into one if there's room; otherwise assign them a time from that subject's page.</p>
+        <form id="matricEnrollForm" class="admin-form">
+          <select id="matricEnrollStudent" required><option value="">Choose a matric student…</option></select>
+          <select id="matricEnrollSubject" required><option value="">Choose a subject…</option></select>
+          <button type="submit">Enrol</button>
+        </form>
+        <p class="auth-feedback" id="matricEnrollFeedback"></p>
       </div>
 
-      <div class="dashboard-card">
-        <h3>Share a Second Chance study resource</h3>
-        <form id="matricResourceForm" class="admin-form">
-          <input id="matricResourceStudentEmail" type="email" placeholder="Student email" required />
-          <input id="matricResourceTitle" type="text" placeholder="Title" required />
-          <input id="matricResourceType" type="text" placeholder="Type (e.g. PDF, Link, Worksheet)" required />
-          <input id="matricResourceUrl" type="url" placeholder="Link (optional)" />
-          <button type="submit">Share</button>
-        </form>
-        <p class="auth-feedback" id="matricResourceFeedback"></p>
-      </div>
+      <p class="card-hint">Giving tasks/assessments and sharing study resources now happens from each subject's own page — open a subject above to do that.</p>
 
       <button id="signOutBtn" type="button">Sign Out</button>
     </section>
@@ -127,7 +99,7 @@
   <script type="module">
     import { initializeApp } from 'https://www.gstatic.com/firebasejs/12.4.0/firebase-app.js';
     import { getAuth, onAuthStateChanged, signOut } from 'https://www.gstatic.com/firebasejs/12.4.0/firebase-auth.js';
-    import { getFirestore, collection, query, where, getDocs, updateDoc, doc, deleteDoc, addDoc, serverTimestamp, writeBatch, Timestamp } from 'https://www.gstatic.com/firebasejs/12.4.0/firebase-firestore.js';
+    import { getFirestore, collection, getDocs, updateDoc, doc, deleteDoc, addDoc, serverTimestamp } from 'https://www.gstatic.com/firebasejs/12.4.0/firebase-firestore.js';
     import { getFunctions, httpsCallable } from 'https://www.gstatic.com/firebasejs/12.4.0/firebase-functions.js';
     import { firebaseConfig, isFirebaseConfigured } from './firebase-config.js';
 
@@ -162,9 +134,6 @@
     const matricEnrollStudent = document.getElementById('matricEnrollStudent');
     const matricEnrollSubject = document.getElementById('matricEnrollSubject');
     const matricEnrollFeedback = document.getElementById('matricEnrollFeedback');
-    const matricAssignForm = document.getElementById('matricAssignForm');
-    const matricAssignGroup = document.getElementById('matricAssignGroup');
-    const matricAssignFeedback = document.getElementById('matricAssignFeedback');
 
     let allMatricSubjects = [];
     let allMatricGroups = [];
@@ -250,10 +219,6 @@
           `;
         }).join('')
         : '<li>No class slots yet — create one above.</li>';
-
-      matricAssignGroup.innerHTML = '<option value="">Choose a class slot…</option>' + allMatricGroups
-        .map((g) => `<option value="${g.id}">${g.subject} — ${DAY_NAMES[g.dayOfWeek]} ${g.startTime}–${g.endTime} (${(g.studentIds || []).length}/${g.capacity || 4})</option>`)
-        .join('');
     }
 
     matricGroupForm.addEventListener('submit', async (event) => {
@@ -331,81 +296,6 @@
       } catch (error) {
         matricEnrollFeedback.textContent = error.message || 'Could not enrol this student.';
       }
-    });
-
-    matricAssignForm.addEventListener('submit', async (event) => {
-      event.preventDefault();
-      matricAssignFeedback.textContent = 'Assigning…';
-
-      const groupId = matricAssignGroup.value;
-      const group = allMatricGroups.find((g) => g.id === groupId);
-      const title = document.getElementById('matricAssignTitle').value.trim();
-      const description = document.getElementById('matricAssignDescription').value.trim();
-      const type = document.getElementById('matricAssignType').value;
-      const dueValue = document.getElementById('matricAssignDue').value;
-
-      if (!group || !group.studentIds || !group.studentIds.length) {
-        matricAssignFeedback.textContent = 'That class slot has no students enrolled yet.';
-        return;
-      }
-
-      const batch = writeBatch(db);
-      group.studentIds.forEach((studentId) => {
-        const student = matricStudentById[studentId];
-        batch.set(doc(collection(db, 'matricAssignments')), {
-          groupId,
-          subject: group.subject,
-          studentId,
-          studentEmail: student ? student.email : '',
-          title,
-          description,
-          type,
-          dueAt: Timestamp.fromDate(new Date(dueValue)),
-          status: 'assigned',
-          submissionNote: '',
-          fileUrl: null,
-          fileName: null,
-          feedback: '',
-          createdBy: auth.currentUser.uid,
-          createdAt: serverTimestamp()
-        });
-      });
-      await batch.commit();
-
-      matricAssignFeedback.textContent = `Assigned to ${group.studentIds.length} student(s).`;
-      matricAssignForm.reset();
-    });
-
-    document.getElementById('matricResourceForm').addEventListener('submit', async (event) => {
-      event.preventDefault();
-      const matricResourceFeedback = document.getElementById('matricResourceFeedback');
-      matricResourceFeedback.textContent = 'Sharing…';
-
-      const studentEmail = document.getElementById('matricResourceStudentEmail').value.trim();
-      const title = document.getElementById('matricResourceTitle').value.trim();
-      const type = document.getElementById('matricResourceType').value.trim();
-      const url = document.getElementById('matricResourceUrl').value.trim();
-
-      const studentQuery = query(collection(db, 'matricStudents'), where('email', '==', studentEmail));
-      const studentSnap = await getDocs(studentQuery);
-
-      if (studentSnap.empty) {
-        matricResourceFeedback.textContent = 'No Second Chance student found with that email.';
-        return;
-      }
-
-      await addDoc(collection(db, 'matricStudyResources'), {
-        studentId: studentSnap.docs[0].id,
-        studentEmail,
-        title,
-        type,
-        url: url || null,
-        createdBy: auth.currentUser.uid,
-        createdAt: serverTimestamp()
-      });
-
-      matricResourceFeedback.textContent = 'Shared.';
-      event.target.reset();
     });
 
     onAuthStateChanged(auth, async (user) => {
