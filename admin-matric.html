@@ -41,33 +41,30 @@
       <h2 id="welcomeMessage">Second Chance Programme</h2>
       <p id="summaryText">HelloEducation's Second Chance Programme — fixed-timetable online schooling for matric re-write students, separate from general tutoring. Groups of up to 4 students share a weekly class slot (Monday–Thursday, 9am–3pm) per subject.</p>
 
-      <div class="dashboard-grid dashboard-grid-2">
-        <div class="dashboard-card">
-          <h3>Subjects</h3>
-          <form id="matricSubjectForm" class="admin-form">
-            <input id="matricSubjectName" type="text" placeholder="Subject name (e.g. Mathematics)" required />
-            <button type="submit">Add subject</button>
-          </form>
-          <ul id="matricSubjectsList"><li>Loading…</li></ul>
-        </div>
-        <div class="dashboard-card">
-          <h3>Create a class slot</h3>
-          <p class="card-hint">Capacity is fixed at 4 students per slot. A video call link is generated automatically.</p>
-          <form id="matricGroupForm" class="admin-form">
-            <select id="matricGroupSubject" required><option value="">Choose a subject…</option></select>
-            <select id="matricGroupDay" required>
-              <option value="1">Monday</option>
-              <option value="2">Tuesday</option>
-              <option value="3">Wednesday</option>
-              <option value="4">Thursday</option>
-            </select>
-            <input id="matricGroupStart" type="time" min="09:00" max="15:00" required />
-            <input id="matricGroupEnd" type="time" min="09:00" max="15:00" required />
-            <select id="matricGroupTutor" required><option value="">Choose a tutor…</option></select>
-            <button type="submit">Create slot</button>
-          </form>
-          <p class="auth-feedback" id="matricGroupFeedback"></p>
-        </div>
+      <div class="dashboard-card">
+        <h3>Subjects</h3>
+        <form id="matricSubjectForm" class="admin-form">
+          <input id="matricSubjectName" type="text" placeholder="Subject name (e.g. Mathematics)" required />
+          <button type="submit">Add subject</button>
+        </form>
+        <ul id="matricSubjectsList"><li>Loading…</li></ul>
+
+        <h3>Create a class slot</h3>
+        <p class="card-hint">Capacity is fixed at 4 students per slot. A video call link is generated automatically.</p>
+        <form id="matricGroupForm" class="admin-form">
+          <select id="matricGroupSubject" required><option value="">Choose a subject…</option></select>
+          <select id="matricGroupDay" required>
+            <option value="1">Monday</option>
+            <option value="2">Tuesday</option>
+            <option value="3">Wednesday</option>
+            <option value="4">Thursday</option>
+          </select>
+          <input id="matricGroupStart" type="time" min="09:00" max="15:00" required />
+          <input id="matricGroupEnd" type="time" min="09:00" max="15:00" required />
+          <select id="matricGroupTutor" required><option value="">Choose a tutor…</option></select>
+          <button type="submit">Create slot</button>
+        </form>
+        <p class="auth-feedback" id="matricGroupFeedback"></p>
       </div>
 
       <div class="dashboard-card">
