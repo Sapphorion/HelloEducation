@@ -332,44 +332,48 @@
       const dueValue = document.getElementById('assignDue').value;
       const file = document.getElementById('assignFile').files[0];
 
-      let attachmentUrl = null;
-      let attachmentName = null;
-      if (file) {
-        assignFeedback.textContent = 'Uploading…';
-        const fileRef = ref(storage, `study-resources/${auth.currentUser.uid}/${Date.now()}-${file.name}`);
-        await uploadBytes(fileRef, file);
-        attachmentUrl = await getDownloadURL(fileRef);
-        attachmentName = file.name;
-      }
+      try {
+        let attachmentUrl = null;
+        let attachmentName = null;
+        if (file) {
+          assignFeedback.textContent = 'Uploading…';
+          const fileRef = ref(storage, `study-resources/${auth.currentUser.uid}/${Date.now()}-${file.name}`);
+          await uploadBytes(fileRef, file);
+          attachmentUrl = await getDownloadURL(fileRef);
+          attachmentName = file.name;
+        }
 
-      assignFeedback.textContent = 'Assigning…';
-      const batch = writeBatch(db);
-      roster.forEach((student) => {
-        batch.set(doc(collection(db, 'matricAssignments')), {
-          groupId: null,
-          subject,
-          studentId: student.id,
-          studentEmail: student.email || '',
-          title,
-          description,
-          attachmentUrl,
-          attachmentName,
-          type,
-          dueAt: Timestamp.fromDate(new Date(dueValue)),
-          status: 'assigned',
-          submissionNote: '',
-          fileUrl: null,
-          fileName: null,
-          feedback: '',
-          createdBy: auth.currentUser.uid,
-          createdAt: serverTimestamp()
+        assignFeedback.textContent = 'Assigning…';
+        const batch = writeBatch(db);
+        roster.forEach((student) => {
+          batch.set(doc(collection(db, 'matricAssignments')), {
+            groupId: null,
+            subject,
+            studentId: student.id,
+            studentEmail: student.email || '',
+            title,
+            description,
+            attachmentUrl,
+            attachmentName,
+            type,
+            dueAt: Timestamp.fromDate(new Date(dueValue)),
+            status: 'assigned',
+            submissionNote: '',
+            fileUrl: null,
+            fileName: null,
+            feedback: '',
+            createdBy: auth.currentUser.uid,
+            createdAt: serverTimestamp()
+          });
         });
-      });
-      await batch.commit();
+        await batch.commit();
 
-      assignFeedback.textContent = `Assigned to ${roster.length} student(s).`;
-      assignForm.reset();
-      await renderRecentContent();
+        assignFeedback.textContent = `Assigned to ${roster.length} student(s).`;
+        assignForm.reset();
+        await renderRecentContent();
+      } catch (error) {
+        assignFeedback.textContent = error.message || 'Could not assign this. Please try again.';
+      }
     });
 
     resourceForm.addEventListener('submit', async (event) => {
@@ -385,32 +389,36 @@
       let url = document.getElementById('resourceUrl').value.trim();
       const file = document.getElementById('resourceFile').files[0];
 
-      if (file) {
-        resourceFeedback.textContent = 'Uploading…';
-        const fileRef = ref(storage, `study-resources/${auth.currentUser.uid}/${Date.now()}-${file.name}`);
-        await uploadBytes(fileRef, file);
-        url = await getDownloadURL(fileRef);
-      }
+      try {
+        if (file) {
+          resourceFeedback.textContent = 'Uploading…';
+          const fileRef = ref(storage, `study-resources/${auth.currentUser.uid}/${Date.now()}-${file.name}`);
+          await uploadBytes(fileRef, file);
+          url = await getDownloadURL(fileRef);
+        }
 
-      resourceFeedback.textContent = 'Sharing…';
-      const batch = writeBatch(db);
-      roster.forEach((student) => {
-        batch.set(doc(collection(db, 'matricStudyResources')), {
-          subject,
-          studentId: student.id,
-          studentEmail: student.email || '',
-          title,
-          type,
-          url: url || null,
-          createdBy: auth.currentUser.uid,
-          createdAt: serverTimestamp()
+        resourceFeedback.textContent = 'Sharing…';
+        const batch = writeBatch(db);
+        roster.forEach((student) => {
+          batch.set(doc(collection(db, 'matricStudyResources')), {
+            subject,
+            studentId: student.id,
+            studentEmail: student.email || '',
+            title,
+            type,
+            url: url || null,
+            createdBy: auth.currentUser.uid,
+            createdAt: serverTimestamp()
+          });
         });
-      });
-      await batch.commit();
+        await batch.commit();
 
-      resourceFeedback.textContent = `Shared with ${roster.length} student(s).`;
-      resourceForm.reset();
-      await renderRecentContent();
+        resourceFeedback.textContent = `Shared with ${roster.length} student(s).`;
+        resourceForm.reset();
+        await renderRecentContent();
+      } catch (error) {
+        resourceFeedback.textContent = error.message || 'Could not share this. Please try again.';
+      }
     });
 
     async function renderRecentContent() {

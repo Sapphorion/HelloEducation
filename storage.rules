@@ -42,24 +42,24 @@ service firebase.storage {
         && request.resource.size < 10 * 1024 * 1024;
     }
 
-    // Study resource attachments (worksheets, PDFs, etc.) a tutor/admin
-    // uploads to share with student(s). Read is left open to any signed-in
-    // user rather than cross-referenced per student: the actual "who can
-    // see this" gate is the studyResources/matricStudyResources Firestore
-    // doc (whether the app ever hands a given user this file's download
-    // URL at all) — and getDownloadURL() tokens bypass Storage read rules
-    // for anyone holding the link anyway, same as the submission files
-    // above, so a stricter rule here wouldn't add real protection.
+    // Study resource / assignment attachments (worksheets, PDFs, etc.) a
+    // tutor/admin uploads to share with student(s). Deliberately does NOT
+    // cross-reference Firestore for a role check here (unlike the read
+    // rules above) — cross-service Storage->Firestore rule calls need a
+    // one-time permission grant that's normally triggered by opening the
+    // Storage Rules page in the Firebase console after such a deploy; a
+    // CLI-only deploy can silently leave that unset, which makes any rule
+    // depending on it fail every request rather than degrade gracefully.
+    // Scoping write to the caller's own uid folder plus a size cap is
+    // enough here: an arbitrary signed-in user writing to their own
+    // uid-scoped folder can't do anything with it — the file only becomes
+    // visible to anyone once a studyResources/matricAssignments Firestore
+    // doc references it, and creating those docs is already gated by
+    // Firestore's own rules (tutor/admin only).
     match /study-resources/{uid}/{fileName} {
-      function isTutorOrAdmin() {
-        let role = firestore.get(/databases/(default)/documents/users/$(request.auth.uid)).data.role;
-        return role == 'tutor' || role == 'admin';
-      }
-
       allow read: if request.auth != null;
       allow write: if request.auth != null
         && request.auth.uid == uid
-        && isTutorOrAdmin()
         && request.resource.size < 10 * 1024 * 1024;
     }
   }

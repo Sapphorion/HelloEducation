@@ -324,33 +324,37 @@
       let url = document.getElementById('matricResourceUrl').value.trim();
       const file = document.getElementById('matricResourceFile').files[0];
 
-      const studentQuery = query(collection(db, 'matricStudents'), where('email', '==', studentEmail));
-      const studentSnap = await getDocs(studentQuery);
+      try {
+        const studentQuery = query(collection(db, 'matricStudents'), where('email', '==', studentEmail));
+        const studentSnap = await getDocs(studentQuery);
 
-      if (studentSnap.empty) {
-        matricResourceFeedback.textContent = 'No Second Chance student found with that email.';
-        return;
+        if (studentSnap.empty) {
+          matricResourceFeedback.textContent = 'No Second Chance student found with that email.';
+          return;
+        }
+
+        if (file) {
+          matricResourceFeedback.textContent = 'Uploading…';
+          const fileRef = ref(storage, `study-resources/${auth.currentUser.uid}/${Date.now()}-${file.name}`);
+          await uploadBytes(fileRef, file);
+          url = await getDownloadURL(fileRef);
+        }
+
+        await addDoc(collection(db, 'matricStudyResources'), {
+          studentId: studentSnap.docs[0].id,
+          studentEmail,
+          title,
+          type,
+          url: url || null,
+          createdBy: auth.currentUser.uid,
+          createdAt: serverTimestamp()
+        });
+
+        matricResourceFeedback.textContent = 'Shared.';
+        event.target.reset();
+      } catch (error) {
+        matricResourceFeedback.textContent = error.message || 'Could not share this. Please try again.';
       }
-
-      if (file) {
-        matricResourceFeedback.textContent = 'Uploading…';
-        const fileRef = ref(storage, `study-resources/${auth.currentUser.uid}/${Date.now()}-${file.name}`);
-        await uploadBytes(fileRef, file);
-        url = await getDownloadURL(fileRef);
-      }
-
-      await addDoc(collection(db, 'matricStudyResources'), {
-        studentId: studentSnap.docs[0].id,
-        studentEmail,
-        title,
-        type,
-        url: url || null,
-        createdBy: auth.currentUser.uid,
-        createdAt: serverTimestamp()
-      });
-
-      matricResourceFeedback.textContent = 'Shared.';
-      event.target.reset();
     });
 
     const matricQuestionsList = document.getElementById('matricQuestionsList');
@@ -463,45 +467,49 @@
         return;
       }
 
-      const file = document.getElementById('matricAssignFile').files[0];
-      let attachmentUrl = null;
-      let attachmentName = null;
-      if (file) {
-        matricAssignFeedback.textContent = 'Uploading…';
-        const fileRef = ref(storage, `study-resources/${auth.currentUser.uid}/${Date.now()}-${file.name}`);
-        await uploadBytes(fileRef, file);
-        attachmentUrl = await getDownloadURL(fileRef);
-        attachmentName = file.name;
-      }
+      try {
+        const file = document.getElementById('matricAssignFile').files[0];
+        let attachmentUrl = null;
+        let attachmentName = null;
+        if (file) {
+          matricAssignFeedback.textContent = 'Uploading…';
+          const fileRef = ref(storage, `study-resources/${auth.currentUser.uid}/${Date.now()}-${file.name}`);
+          await uploadBytes(fileRef, file);
+          attachmentUrl = await getDownloadURL(fileRef);
+          attachmentName = file.name;
+        }
 
-      const batch = writeBatch(db);
-      group.studentIds.forEach((studentId) => {
-        const student = matricStudentById[studentId];
-        batch.set(doc(collection(db, 'matricAssignments')), {
-          groupId,
-          subject: group.subject,
-          studentId,
-          studentEmail: student ? student.email : '',
-          title,
-          description,
-          attachmentUrl,
-          attachmentName,
-          type,
-          dueAt: Timestamp.fromDate(new Date(dueValue)),
-          status: 'assigned',
-          submissionNote: '',
-          fileUrl: null,
-          fileName: null,
-          feedback: '',
-          createdBy: auth.currentUser.uid,
-          createdAt: serverTimestamp()
+        const batch = writeBatch(db);
+        group.studentIds.forEach((studentId) => {
+          const student = matricStudentById[studentId];
+          batch.set(doc(collection(db, 'matricAssignments')), {
+            groupId,
+            subject: group.subject,
+            studentId,
+            studentEmail: student ? student.email : '',
+            title,
+            description,
+            attachmentUrl,
+            attachmentName,
+            type,
+            dueAt: Timestamp.fromDate(new Date(dueValue)),
+            status: 'assigned',
+            submissionNote: '',
+            fileUrl: null,
+            fileName: null,
+            feedback: '',
+            createdBy: auth.currentUser.uid,
+            createdAt: serverTimestamp()
+          });
         });
-      });
-      await batch.commit();
+        await batch.commit();
 
-      matricAssignFeedback.textContent = `Assigned to ${group.studentIds.length} student(s).`;
-      matricAssignForm.reset();
-      await renderMyMatricAssignments();
+        matricAssignFeedback.textContent = `Assigned to ${group.studentIds.length} student(s).`;
+        matricAssignForm.reset();
+        await renderMyMatricAssignments();
+      } catch (error) {
+        matricAssignFeedback.textContent = error.message || 'Could not assign this. Please try again.';
+      }
     });
 
     async function renderMyMatricAssignments() {
@@ -564,43 +572,47 @@
       const description = document.getElementById('assignDescription').value.trim();
       const file = document.getElementById('assignFile').files[0];
 
-      const studentQuery = query(collection(db, 'users'), where('email', '==', studentEmail), where('role', '==', 'student'));
-      const studentSnap = await getDocs(studentQuery);
+      try {
+        const studentQuery = query(collection(db, 'users'), where('email', '==', studentEmail), where('role', '==', 'student'));
+        const studentSnap = await getDocs(studentQuery);
 
-      if (studentSnap.empty) {
-        assignFeedback.textContent = 'No student account found with that email.';
-        return;
+        if (studentSnap.empty) {
+          assignFeedback.textContent = 'No student account found with that email.';
+          return;
+        }
+
+        let attachmentUrl = null;
+        let attachmentName = null;
+        if (file) {
+          assignFeedback.textContent = 'Uploading…';
+          const fileRef = ref(storage, `study-resources/${auth.currentUser.uid}/${Date.now()}-${file.name}`);
+          await uploadBytes(fileRef, file);
+          attachmentUrl = await getDownloadURL(fileRef);
+          attachmentName = file.name;
+        }
+
+        await addDoc(collection(db, 'assignments'), {
+          studentId: studentSnap.docs[0].id,
+          studentEmail,
+          title,
+          description,
+          attachmentUrl,
+          attachmentName,
+          status: 'assigned',
+          submissionNote: '',
+          fileUrl: null,
+          fileName: null,
+          feedback: '',
+          createdBy: auth.currentUser.uid,
+          createdAt: serverTimestamp()
+        });
+
+        assignFeedback.textContent = 'Assigned.';
+        assignForm.reset();
+        await renderAssignments();
+      } catch (error) {
+        assignFeedback.textContent = error.message || 'Could not assign this. Please try again.';
       }
-
-      let attachmentUrl = null;
-      let attachmentName = null;
-      if (file) {
-        assignFeedback.textContent = 'Uploading…';
-        const fileRef = ref(storage, `study-resources/${auth.currentUser.uid}/${Date.now()}-${file.name}`);
-        await uploadBytes(fileRef, file);
-        attachmentUrl = await getDownloadURL(fileRef);
-        attachmentName = file.name;
-      }
-
-      await addDoc(collection(db, 'assignments'), {
-        studentId: studentSnap.docs[0].id,
-        studentEmail,
-        title,
-        description,
-        attachmentUrl,
-        attachmentName,
-        status: 'assigned',
-        submissionNote: '',
-        fileUrl: null,
-        fileName: null,
-        feedback: '',
-        createdBy: auth.currentUser.uid,
-        createdAt: serverTimestamp()
-      });
-
-      assignFeedback.textContent = 'Assigned.';
-      assignForm.reset();
-      await renderAssignments();
     });
 
     function materialLink(materialId) {
@@ -679,33 +691,37 @@
       let url = document.getElementById('resourceUrl').value.trim();
       const file = document.getElementById('resourceFile').files[0];
 
-      const studentQuery = query(collection(db, 'users'), where('email', '==', studentEmail), where('role', '==', 'student'));
-      const studentSnap = await getDocs(studentQuery);
+      try {
+        const studentQuery = query(collection(db, 'users'), where('email', '==', studentEmail), where('role', '==', 'student'));
+        const studentSnap = await getDocs(studentQuery);
 
-      if (studentSnap.empty) {
-        resourceFeedback.textContent = 'No student account found with that email.';
-        return;
+        if (studentSnap.empty) {
+          resourceFeedback.textContent = 'No student account found with that email.';
+          return;
+        }
+
+        if (file) {
+          resourceFeedback.textContent = 'Uploading…';
+          const fileRef = ref(storage, `study-resources/${auth.currentUser.uid}/${Date.now()}-${file.name}`);
+          await uploadBytes(fileRef, file);
+          url = await getDownloadURL(fileRef);
+        }
+
+        await addDoc(collection(db, 'studyResources'), {
+          studentId: studentSnap.docs[0].id,
+          studentEmail,
+          title,
+          type,
+          url: url || null,
+          createdBy: auth.currentUser.uid,
+          createdAt: serverTimestamp()
+        });
+
+        resourceFeedback.textContent = 'Shared.';
+        event.target.reset();
+      } catch (error) {
+        resourceFeedback.textContent = error.message || 'Could not share this. Please try again.';
       }
-
-      if (file) {
-        resourceFeedback.textContent = 'Uploading…';
-        const fileRef = ref(storage, `study-resources/${auth.currentUser.uid}/${Date.now()}-${file.name}`);
-        await uploadBytes(fileRef, file);
-        url = await getDownloadURL(fileRef);
-      }
-
-      await addDoc(collection(db, 'studyResources'), {
-        studentId: studentSnap.docs[0].id,
-        studentEmail,
-        title,
-        type,
-        url: url || null,
-        createdBy: auth.currentUser.uid,
-        createdAt: serverTimestamp()
-      });
-
-      resourceFeedback.textContent = 'Shared.';
-      event.target.reset();
     });
 
     assignmentsList.addEventListener('click', async (event) => {
