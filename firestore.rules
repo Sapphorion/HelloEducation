@@ -34,7 +34,11 @@ service cloud.firestore {
     }
 
     match /users/{userId} {
-      allow read: if signedIn() && (request.auth.uid == userId || isAdmin(request.auth.uid));
+      // Tutors need this to look up a student by email when logging a
+      // session, assigning work, or sharing a resource — those forms query
+      // this collection by email/role from the client, which Firestore can
+      // only allow if the rule holds without a per-document lookup.
+      allow read: if signedIn() && (request.auth.uid == userId || isAdmin(request.auth.uid) || isTutor(request.auth.uid));
       // Self-serve signup may only claim the student role. Tutor, parent and
       // admin roles must be granted by an existing admin (via the admin
       // dashboard or directly in the Firestore console) — never self-assigned.
@@ -157,7 +161,9 @@ service cloud.firestore {
     // (matricStudent role) from general tutoring. Profile doc mirrors
     // students/{uid} but is admin-managed only — no self-serve create.
     match /matricStudents/{studentId} {
-      allow read: if signedIn() && (request.auth.uid == studentId || isAdmin(request.auth.uid));
+      // Tutors need this to look up a Second Chance student by email when
+      // sharing a resource with them from the tutor dashboard.
+      allow read: if signedIn() && (request.auth.uid == studentId || isAdmin(request.auth.uid) || isTutor(request.auth.uid));
       allow write: if isAdmin(request.auth.uid);
     }
 
