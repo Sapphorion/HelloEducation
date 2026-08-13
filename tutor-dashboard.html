@@ -88,6 +88,27 @@
 
       <div class="dashboard-grid dashboard-grid-2">
         <div class="dashboard-card">
+          <h3>Share a study resource</h3>
+          <p class="card-hint">To share an AI-generated material, copy its link from "My materials" below into the link field below.</p>
+          <form id="resourceForm" class="admin-form">
+            <input id="resourceStudentEmail" type="email" placeholder="Student email" required />
+            <input id="resourceTitle" type="text" placeholder="Title (e.g. GCSE Maths formula sheet)" required />
+            <input id="resourceType" type="text" placeholder="Type (e.g. PDF, Link, Worksheet)" required />
+            <input id="resourceUrl" type="url" placeholder="Link (optional)" />
+            <label class="card-hint" for="resourceFile">Or upload a file (PDF, Word, PowerPoint, image — max 10MB)</label>
+            <input id="resourceFile" type="file" accept=".pdf,.doc,.docx,.ppt,.pptx,.xls,.xlsx,image/*" />
+            <button type="submit">Share</button>
+          </form>
+          <p class="auth-feedback" id="resourceFeedback"></p>
+        </div>
+        <div class="dashboard-card">
+          <h3>Resources I've shared</h3>
+          <ul id="resourcesList"><li>Loading…</li></ul>
+        </div>
+      </div>
+
+      <div class="dashboard-grid dashboard-grid-2">
+        <div class="dashboard-card">
           <h3>Assign work</h3>
           <p class="card-hint">Shows up on the student's "Today's focus" list. They can submit a note and/or a file back to you.</p>
           <form id="assignForm" class="admin-form">
@@ -128,21 +149,6 @@
       </div>
 
       <div class="dashboard-card">
-        <h3>Share a study resource</h3>
-        <p class="card-hint">To share an AI-generated material, copy its link from "My materials" above into the link field below.</p>
-        <form id="resourceForm" class="admin-form">
-          <input id="resourceStudentEmail" type="email" placeholder="Student email" required />
-          <input id="resourceTitle" type="text" placeholder="Title (e.g. GCSE Maths formula sheet)" required />
-          <input id="resourceType" type="text" placeholder="Type (e.g. PDF, Link, Worksheet)" required />
-          <input id="resourceUrl" type="url" placeholder="Link (optional)" />
-          <label class="card-hint" for="resourceFile">Or upload a file (PDF, Word, PowerPoint, image — max 10MB)</label>
-          <input id="resourceFile" type="file" accept=".pdf,.doc,.docx,.ppt,.pptx,.xls,.xlsx,image/*" />
-          <button type="submit">Share</button>
-        </form>
-        <p class="auth-feedback" id="resourceFeedback"></p>
-      </div>
-
-      <div class="dashboard-card">
         <h3>Questions from students</h3>
         <ul id="questionsList"><li>Loading…</li></ul>
       </div>
@@ -151,6 +157,26 @@
         <h3>My Second Chance classes</h3>
         <p class="card-hint">Your fixed weekly class slots for the Second Chance Programme (matric re-write).</p>
         <ul id="matricGroupsList"><li>Loading…</li></ul>
+      </div>
+
+      <div class="dashboard-grid dashboard-grid-2">
+        <div class="dashboard-card">
+          <h3>Share a Second Chance study resource</h3>
+          <form id="matricResourceForm" class="admin-form">
+            <input id="matricResourceStudentEmail" type="email" placeholder="Student email" required />
+            <input id="matricResourceTitle" type="text" placeholder="Title (e.g. Maths formula sheet)" required />
+            <input id="matricResourceType" type="text" placeholder="Type (e.g. PDF, Link, Worksheet)" required />
+            <input id="matricResourceUrl" type="url" placeholder="Link (optional)" />
+            <label class="card-hint" for="matricResourceFile">Or upload a file (PDF, Word, PowerPoint, image — max 10MB)</label>
+            <input id="matricResourceFile" type="file" accept=".pdf,.doc,.docx,.ppt,.pptx,.xls,.xlsx,image/*" />
+            <button type="submit">Share</button>
+          </form>
+          <p class="auth-feedback" id="matricResourceFeedback"></p>
+        </div>
+        <div class="dashboard-card">
+          <h3>Second Chance resources I've shared</h3>
+          <ul id="matricResourcesList"><li>Loading…</li></ul>
+        </div>
       </div>
 
       <div class="dashboard-grid dashboard-grid-2">
@@ -176,20 +202,6 @@
           <h3>Second Chance tasks/assessments I've given</h3>
           <ul id="matricAssignmentsList"><li>Loading…</li></ul>
         </div>
-      </div>
-
-      <div class="dashboard-card">
-        <h3>Share a Second Chance study resource</h3>
-        <form id="matricResourceForm" class="admin-form">
-          <input id="matricResourceStudentEmail" type="email" placeholder="Student email" required />
-          <input id="matricResourceTitle" type="text" placeholder="Title (e.g. Maths formula sheet)" required />
-          <input id="matricResourceType" type="text" placeholder="Type (e.g. PDF, Link, Worksheet)" required />
-          <input id="matricResourceUrl" type="url" placeholder="Link (optional)" />
-          <label class="card-hint" for="matricResourceFile">Or upload a file (PDF, Word, PowerPoint, image — max 10MB)</label>
-          <input id="matricResourceFile" type="file" accept=".pdf,.doc,.docx,.ppt,.pptx,.xls,.xlsx,image/*" />
-          <button type="submit">Share</button>
-        </form>
-        <p class="auth-feedback" id="matricResourceFeedback"></p>
       </div>
 
       <div class="dashboard-card">
@@ -262,12 +274,14 @@
     const assignForm = document.getElementById('assignForm');
     const assignFeedback = document.getElementById('assignFeedback');
     const assignmentsList = document.getElementById('assignmentsList');
+    const resourcesList = document.getElementById('resourcesList');
     const questionsList = document.getElementById('questionsList');
     const matricGroupsList = document.getElementById('matricGroupsList');
     const matricAssignForm = document.getElementById('matricAssignForm');
     const matricAssignGroup = document.getElementById('matricAssignGroup');
     const matricAssignFeedback = document.getElementById('matricAssignFeedback');
     const matricAssignmentsList = document.getElementById('matricAssignmentsList');
+    const matricResourcesList = document.getElementById('matricResourcesList');
     const signOutBtn = document.getElementById('signOutBtn');
     const changePasswordForm = document.getElementById('changePasswordForm');
     const changePasswordFeedback = document.getElementById('changePasswordFeedback');
@@ -352,6 +366,7 @@
 
         matricResourceFeedback.textContent = 'Shared.';
         event.target.reset();
+        await renderMatricResources();
       } catch (error) {
         matricResourceFeedback.textContent = error.message || 'Could not share this. Please try again.';
       }
@@ -532,6 +547,32 @@
         : '<li>No Second Chance tasks/assessments given yet.</li>';
     }
 
+    async function renderMatricResources() {
+      if (!auth.currentUser) return;
+      const resourcesQuery = query(collection(db, 'matricStudyResources'), where('createdBy', '==', auth.currentUser.uid));
+      const snapshot = await getDocs(resourcesQuery);
+      const resources = snapshot.docs
+        .map((docSnap) => ({ id: docSnap.id, ...docSnap.data() }))
+        .sort((a, b) => (b.createdAt?.toMillis() || 0) - (a.createdAt?.toMillis() || 0));
+
+      matricResourcesList.innerHTML = resources.length
+        ? resources.map((r) => `
+          <li>
+            <span>${r.title} — ${r.studentEmail || 'Student'} <span class="status-badge">${r.type}</span>${r.url ? ` — <a href="${r.url}" target="_blank" rel="noopener">Open</a>` : ''}</span>
+            <button class="action-btn secondary" data-remove-resource="${r.id}" type="button">Remove</button>
+          </li>
+        `).join('')
+        : '<li>Nothing shared yet.</li>';
+    }
+
+    matricResourcesList.addEventListener('click', async (event) => {
+      const button = event.target.closest('button[data-remove-resource]');
+      if (!button) return;
+      if (!confirm('Remove this resource?')) return;
+      await deleteDoc(doc(db, 'matricStudyResources', button.dataset.removeResource));
+      await renderMatricResources();
+    });
+
     let allMyAssignments = [];
 
     async function renderAssignments() {
@@ -562,6 +603,32 @@
         `).join('')
         : '<li>No assignments given yet.</li>';
     }
+
+    async function renderResources() {
+      if (!auth.currentUser) return;
+      const resourcesQuery = query(collection(db, 'studyResources'), where('createdBy', '==', auth.currentUser.uid));
+      const snapshot = await getDocs(resourcesQuery);
+      const resources = snapshot.docs
+        .map((docSnap) => ({ id: docSnap.id, ...docSnap.data() }))
+        .sort((a, b) => (b.createdAt?.toMillis() || 0) - (a.createdAt?.toMillis() || 0));
+
+      resourcesList.innerHTML = resources.length
+        ? resources.map((r) => `
+          <li>
+            <span>${r.title} — ${r.studentEmail || 'Student'} <span class="status-badge">${r.type}</span>${r.url ? ` — <a href="${r.url}" target="_blank" rel="noopener">Open</a>` : ''}</span>
+            <button class="action-btn secondary" data-remove-resource="${r.id}" type="button">Remove</button>
+          </li>
+        `).join('')
+        : '<li>Nothing shared yet.</li>';
+    }
+
+    resourcesList.addEventListener('click', async (event) => {
+      const button = event.target.closest('button[data-remove-resource]');
+      if (!button) return;
+      if (!confirm('Remove this resource?')) return;
+      await deleteDoc(doc(db, 'studyResources', button.dataset.removeResource));
+      await renderResources();
+    });
 
     assignForm.addEventListener('submit', async (event) => {
       event.preventDefault();
@@ -719,6 +786,7 @@
 
         resourceFeedback.textContent = 'Shared.';
         event.target.reset();
+        await renderResources();
       } catch (error) {
         resourceFeedback.textContent = error.message || 'Could not share this. Please try again.';
       }
@@ -888,9 +956,11 @@
       renderMySessions();
       renderAvailability();
       renderAssignments();
+      renderResources();
       renderQuestions();
       renderMyMatricGroups();
       renderMyMatricAssignments();
+      renderMatricResources();
       renderMatricQuestions();
       renderMaterials();
     });

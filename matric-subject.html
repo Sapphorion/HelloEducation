@@ -68,6 +68,19 @@
       </div>
 
       <div class="dashboard-card">
+        <h3>Share a study resource with the whole class</h3>
+        <form id="resourceForm" class="admin-form">
+          <input id="resourceTitle" type="text" placeholder="Title" required />
+          <input id="resourceType" type="text" placeholder="Type (e.g. PDF, Link, Worksheet)" required />
+          <input id="resourceUrl" type="url" placeholder="Link (optional)" />
+          <label class="card-hint" for="resourceFile">Or upload a file (PDF, Word, PowerPoint, image — max 10MB)</label>
+          <input id="resourceFile" type="file" accept=".pdf,.doc,.docx,.ppt,.pptx,.xls,.xlsx,image/*" />
+          <button type="submit">Share with class</button>
+        </form>
+        <p class="auth-feedback" id="resourceFeedback"></p>
+      </div>
+
+      <div class="dashboard-card">
         <h3>Give a task/assessment to the whole class</h3>
         <p class="card-hint">Goes to every student currently enrolled in this subject, scheduled or not.</p>
         <form id="assignForm" class="admin-form">
@@ -85,27 +98,14 @@
         <p class="auth-feedback" id="assignFeedback"></p>
       </div>
 
-      <div class="dashboard-card">
-        <h3>Share a study resource with the whole class</h3>
-        <form id="resourceForm" class="admin-form">
-          <input id="resourceTitle" type="text" placeholder="Title" required />
-          <input id="resourceType" type="text" placeholder="Type (e.g. PDF, Link, Worksheet)" required />
-          <input id="resourceUrl" type="url" placeholder="Link (optional)" />
-          <label class="card-hint" for="resourceFile">Or upload a file (PDF, Word, PowerPoint, image — max 10MB)</label>
-          <input id="resourceFile" type="file" accept=".pdf,.doc,.docx,.ppt,.pptx,.xls,.xlsx,image/*" />
-          <button type="submit">Share with class</button>
-        </form>
-        <p class="auth-feedback" id="resourceFeedback"></p>
-      </div>
-
       <div class="dashboard-grid dashboard-grid-2">
-        <div class="dashboard-card">
-          <h3>Recent assignments</h3>
-          <ul id="recentAssignmentsList"><li>Loading…</li></ul>
-        </div>
         <div class="dashboard-card">
           <h3>Recent resources</h3>
           <ul id="recentResourcesList"><li>Loading…</li></ul>
+        </div>
+        <div class="dashboard-card">
+          <h3>Recent assignments</h3>
+          <ul id="recentAssignmentsList"><li>Loading…</li></ul>
         </div>
       </div>
 
@@ -444,20 +444,41 @@
         ? assignments.map((a) => `<li>${a.title} <span class="status-badge">${a.type}</span> — due ${a.dueAt.toDate().toLocaleString()}${a.attachmentUrl ? ` — <a href="${a.attachmentUrl}" target="_blank" rel="noopener">${a.attachmentName || 'View file'}</a>` : ''}</li>`).join('')
         : '<li>Nothing assigned yet.</li>';
 
-      const seenResources = new Set();
-      const resources = resourcesSnap.docs
-        .map((d) => d.data())
-        .filter((r) => {
-          const key = `${r.title}|${r.createdAt?.seconds}`;
-          if (seenResources.has(key)) return false;
-          seenResources.add(key);
-          return true;
-        });
+      // Group the fanned-out per-student docs back into one entry per
+      // share, collecting every doc id in the group so "Remove" can delete
+      // all of them (one per enrolled student) in a single batch.
+      const resourceGroups = new Map();
+      resourcesSnap.docs.forEach((docSnap) => {
+        const data = docSnap.data();
+        const key = `${data.title}|${data.createdAt?.seconds}`;
+        if (!resourceGroups.has(key)) {
+          resourceGroups.set(key, { ...data, ids: [] });
+        }
+        resourceGroups.get(key).ids.push(docSnap.id);
+      });
+      const resources = [...resourceGroups.values()];
 
       recentResourcesList.innerHTML = resources.length
-        ? resources.map((r) => `<li>${r.title} <span class="status-badge">${r.type}</span>${r.url ? ` — <a href="${r.url}" target="_blank" rel="noopener">Open</a>` : ''}</li>`).join('')
+        ? resources.map((r) => `
+          <li>
+            <span>${r.title} <span class="status-badge">${r.type}</span>${r.url ? ` — <a href="${r.url}" target="_blank" rel="noopener">Open</a>` : ''}</span>
+            <button class="action-btn secondary" data-remove-resource="${r.ids.join(',')}" type="button">Remove</button>
+          </li>
+        `).join('')
         : '<li>Nothing shared yet.</li>';
     }
+
+    recentResourcesList.addEventListener('click', async (event) => {
+      const button = event.target.closest('button[data-remove-resource]');
+      if (!button) return;
+      if (!confirm('Remove this resource for everyone it was shared with?')) return;
+
+      const ids = button.dataset.removeResource.split(',');
+      const batch = writeBatch(db);
+      ids.forEach((id) => batch.delete(doc(db, 'matricStudyResources', id)));
+      await batch.commit();
+      await renderRecentContent();
+    });
 
     onAuthStateChanged(auth, async (user) => {
       if (!user && !isFirebaseConfigured()) {

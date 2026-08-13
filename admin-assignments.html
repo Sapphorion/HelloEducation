@@ -41,6 +41,26 @@
       <h2 id="welcomeMessage">Assignments &amp; Resources</h2>
       <p id="summaryText">Assign work and share study resources directly with students.</p>
 
+      <div class="dashboard-grid dashboard-grid-2">
+        <div class="dashboard-card">
+          <h3>Share a study resource</h3>
+          <form id="adminResourceForm" class="admin-form">
+            <input id="adminResourceStudentEmail" type="email" placeholder="Student email" required />
+            <input id="adminResourceTitle" type="text" placeholder="Title" required />
+            <input id="adminResourceType" type="text" placeholder="Type (e.g. PDF, Link, Worksheet)" required />
+            <input id="adminResourceUrl" type="url" placeholder="Link (optional)" />
+            <label class="card-hint" for="adminResourceFile">Or upload a file (PDF, Word, PowerPoint, image — max 10MB)</label>
+            <input id="adminResourceFile" type="file" accept=".pdf,.doc,.docx,.ppt,.pptx,.xls,.xlsx,image/*" />
+            <button type="submit">Share</button>
+          </form>
+          <p class="auth-feedback" id="adminResourceFeedback"></p>
+        </div>
+        <div class="dashboard-card">
+          <h3>Resources I've shared</h3>
+          <ul id="adminResourcesList"><li>Loading…</li></ul>
+        </div>
+      </div>
+
       <div class="dashboard-card">
         <h3>Assign work to a student</h3>
         <p class="card-hint">Same assignment system tutors use — shows up on the student's "Today's focus" list.</p>
@@ -55,20 +75,6 @@
         <p class="auth-feedback" id="adminAssignFeedback"></p>
       </div>
 
-      <div class="dashboard-card">
-        <h3>Share a study resource</h3>
-        <form id="adminResourceForm" class="admin-form">
-          <input id="adminResourceStudentEmail" type="email" placeholder="Student email" required />
-          <input id="adminResourceTitle" type="text" placeholder="Title" required />
-          <input id="adminResourceType" type="text" placeholder="Type (e.g. PDF, Link, Worksheet)" required />
-          <input id="adminResourceUrl" type="url" placeholder="Link (optional)" />
-          <label class="card-hint" for="adminResourceFile">Or upload a file (PDF, Word, PowerPoint, image — max 10MB)</label>
-          <input id="adminResourceFile" type="file" accept=".pdf,.doc,.docx,.ppt,.pptx,.xls,.xlsx,image/*" />
-          <button type="submit">Share</button>
-        </form>
-        <p class="auth-feedback" id="adminResourceFeedback"></p>
-      </div>
-
       <button id="signOutBtn" type="button">Sign Out</button>
     </section>
   </main>
@@ -80,7 +86,7 @@
   <script type="module">
     import { initializeApp } from 'https://www.gstatic.com/firebasejs/12.4.0/firebase-app.js';
     import { getAuth, onAuthStateChanged, signOut } from 'https://www.gstatic.com/firebasejs/12.4.0/firebase-auth.js';
-    import { getFirestore, collection, query, where, getDocs, addDoc, serverTimestamp } from 'https://www.gstatic.com/firebasejs/12.4.0/firebase-firestore.js';
+    import { getFirestore, collection, query, where, getDocs, addDoc, deleteDoc, doc, serverTimestamp } from 'https://www.gstatic.com/firebasejs/12.4.0/firebase-firestore.js';
     import { getStorage, ref, uploadBytes, getDownloadURL } from 'https://www.gstatic.com/firebasejs/12.4.0/firebase-storage.js';
     import { firebaseConfig, isFirebaseConfigured } from './firebase-config.js';
 
@@ -98,6 +104,33 @@
     const signOutBtn = document.getElementById('signOutBtn');
     const adminAssignForm = document.getElementById('adminAssignForm');
     const adminAssignFeedback = document.getElementById('adminAssignFeedback');
+    const adminResourcesList = document.getElementById('adminResourcesList');
+
+    async function renderAdminResources() {
+      if (!auth.currentUser) return;
+      const resourcesQuery = query(collection(db, 'studyResources'), where('createdBy', '==', auth.currentUser.uid));
+      const snapshot = await getDocs(resourcesQuery);
+      const resources = snapshot.docs
+        .map((docSnap) => ({ id: docSnap.id, ...docSnap.data() }))
+        .sort((a, b) => (b.createdAt?.toMillis() || 0) - (a.createdAt?.toMillis() || 0));
+
+      adminResourcesList.innerHTML = resources.length
+        ? resources.map((r) => `
+          <li>
+            <span>${r.title} — ${r.studentEmail || 'Student'} <span class="status-badge">${r.type}</span>${r.url ? ` — <a href="${r.url}" target="_blank" rel="noopener">Open</a>` : ''}</span>
+            <button class="action-btn secondary" data-remove-resource="${r.id}" type="button">Remove</button>
+          </li>
+        `).join('')
+        : '<li>Nothing shared yet.</li>';
+    }
+
+    adminResourcesList.addEventListener('click', async (event) => {
+      const button = event.target.closest('button[data-remove-resource]');
+      if (!button) return;
+      if (!confirm('Remove this resource?')) return;
+      await deleteDoc(doc(db, 'studyResources', button.dataset.removeResource));
+      await renderAdminResources();
+    });
 
     adminAssignForm.addEventListener('submit', async (event) => {
       event.preventDefault();
@@ -189,6 +222,7 @@
 
         resourceFeedback.textContent = 'Shared.';
         event.target.reset();
+        await renderAdminResources();
       } catch (error) {
         resourceFeedback.textContent = error.message || 'Could not share this. Please try again.';
       }
@@ -203,7 +237,10 @@
 
       if (!user) {
         window.location.href = 'login.html?role=admin';
+        return;
       }
+
+      renderAdminResources();
     });
 
     signOutBtn.addEventListener('click', async () => {
