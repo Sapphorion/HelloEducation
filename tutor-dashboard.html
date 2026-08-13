@@ -914,30 +914,34 @@
       const status = document.getElementById('sessionStatus').value;
       const notes = document.getElementById('sessionNotes').value.trim();
 
-      const studentQuery = query(collection(db, 'users'), where('email', '==', studentEmail), where('role', '==', 'student'));
-      const studentSnap = await getDocs(studentQuery);
+      try {
+        const studentQuery = query(collection(db, 'users'), where('email', '==', studentEmail), where('role', '==', 'student'));
+        const studentSnap = await getDocs(studentQuery);
 
-      if (studentSnap.empty) {
-        sessionFeedback.textContent = 'No student account found with that email.';
-        return;
+        if (studentSnap.empty) {
+          sessionFeedback.textContent = 'No student account found with that email.';
+          return;
+        }
+
+        await addDoc(collection(db, 'sessions'), {
+          studentId: studentSnap.docs[0].id,
+          studentEmail,
+          tutorId: auth.currentUser.uid,
+          subject,
+          scheduledAt: Timestamp.fromDate(new Date(dateTimeValue)),
+          status,
+          format,
+          notes,
+          meetingLink: status === 'scheduled' ? generateMeetingLink() : null,
+          createdAt: serverTimestamp()
+        });
+
+        sessionFeedback.textContent = 'Session saved.';
+        logSessionForm.reset();
+        await renderMySessions();
+      } catch (error) {
+        sessionFeedback.textContent = error.message || 'Could not save this session. Please try again.';
       }
-
-      await addDoc(collection(db, 'sessions'), {
-        studentId: studentSnap.docs[0].id,
-        studentEmail,
-        tutorId: auth.currentUser.uid,
-        subject,
-        scheduledAt: Timestamp.fromDate(new Date(dateTimeValue)),
-        status,
-        format,
-        notes,
-        meetingLink: status === 'scheduled' ? generateMeetingLink() : null,
-        createdAt: serverTimestamp()
-      });
-
-      sessionFeedback.textContent = 'Session saved.';
-      logSessionForm.reset();
-      await renderMySessions();
     });
 
     onAuthStateChanged(auth, async (user) => {
