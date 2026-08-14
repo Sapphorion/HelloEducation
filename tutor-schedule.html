@@ -1,0 +1,373 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>HelloEducation Tutor — Schedule</title>
+  <link rel="stylesheet" href="styling.css" />
+  <link rel="manifest" href="manifest.json" />
+  <link rel="icon" href="favicon.ico" />
+  <link rel="apple-touch-icon" href="icons/apple-touch-icon.png" />
+  <meta name="theme-color" content="#3074f3" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="HelloEducation" />
+</head>
+<body>
+  <header>
+    <h1>HelloEducation</h1>
+    <h1 class="page-heading">Tutor — Schedule</h1>
+  </header>
+
+  <navigation>
+    <ul>
+      <li><a href="index.html">Home</a></li>
+      <li><a href="services.html">Services</a></li>
+      <li><a href="tutors.html">Tutors</a></li>
+      <li><a href="contact.html">Contact</a></li>
+    </ul>
+  </navigation>
+
+  <main class="auth-page">
+    <section class="auth-panel dashboard-panel">
+      <div class="admin-subnav">
+        <a href="tutor-dashboard.html">Overview</a>
+        <a href="tutor-schedule.html" class="active">Schedule</a>
+        <a href="tutor-students.html">Students</a>
+        <a href="tutor-materials.html">Materials</a>
+        <a href="tutor-second-chance.html">Second Chance</a>
+      </div>
+
+      <h2 id="welcomeMessage">Schedule</h2>
+      <p id="summaryText">Set your weekly availability, review booking requests, and log sessions.</p>
+
+      <div class="dashboard-card">
+        <h3>My availability</h3>
+        <p class="card-hint">Click the hours you're free each week — students see these as bookable windows. Click again to remove an hour.</p>
+        <div class="availability-grid-wrapper" id="availabilityGrid"><p>Loading…</p></div>
+      </div>
+
+      <div class="dashboard-card">
+        <h3>Booking requests</h3>
+        <ul id="requestList"><li>Loading…</li></ul>
+      </div>
+
+      <div class="dashboard-card">
+        <h3>Log a session</h3>
+        <p class="card-hint">This is what students and their linked parents see as schedule and progress/feedback. Leave notes blank for an upcoming session, or fill them in once it's done. Scheduled sessions get a video call link automatically — no need to create one yourself.</p>
+        <form id="logSessionForm" class="admin-form">
+          <select id="sessionStudentPicker" data-fill-target="sessionStudentEmail"><option value="">My students (optional — or type an email below)</option></select>
+          <input id="sessionStudentEmail" type="email" placeholder="Student email" required />
+          <input id="sessionSubject" type="text" placeholder="Subject" required />
+          <input id="sessionDateTime" type="datetime-local" required />
+          <select id="sessionFormat" required>
+            <option value="online">Online</option>
+            <option value="faceToFace">Face-to-face</option>
+          </select>
+          <select id="sessionStatus" required>
+            <option value="scheduled">Scheduled</option>
+            <option value="completed">Completed</option>
+            <option value="cancelled">Cancelled</option>
+          </select>
+          <textarea id="sessionNotes" placeholder="Notes / feedback (optional)" rows="2"></textarea>
+          <button type="submit">Save session</button>
+        </form>
+        <p class="auth-feedback" id="sessionFeedback"></p>
+      </div>
+
+      <div class="dashboard-card">
+        <h3>My logged sessions</h3>
+        <ul id="mySessionsList"><li>Loading…</li></ul>
+      </div>
+
+      <button id="signOutBtn" type="button">Sign Out</button>
+    </section>
+  </main>
+
+  <footer>
+    <p>&copy; 2023 HelloEducation. All rights reserved.</p>
+  </footer>
+
+  <script type="module">
+    import { initializeApp } from 'https://www.gstatic.com/firebasejs/12.4.0/firebase-app.js';
+    import { getAuth, onAuthStateChanged, signOut } from 'https://www.gstatic.com/firebasejs/12.4.0/firebase-auth.js';
+    import { getFirestore, collection, query, where, orderBy, getDocs, addDoc, deleteDoc, updateDoc, doc, Timestamp, serverTimestamp } from 'https://www.gstatic.com/firebasejs/12.4.0/firebase-firestore.js';
+    import { firebaseConfig, isFirebaseConfigured } from './firebase-config.js';
+
+    const DAY_NAMES = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+    const AVAILABILITY_HOURS = Array.from({ length: 14 }, (_, i) => i + 7); // 7am–9pm
+
+    function pad2(n) { return String(n).padStart(2, '0'); }
+
+    function hourLabel(hour) {
+      const period = hour < 12 ? 'am' : 'pm';
+      const displayHour = hour % 12 === 0 ? 12 : hour % 12;
+      return `${displayHour}${period}`;
+    }
+
+    // Auto-generates a free Jitsi Meet video call room — no account, API key,
+    // or setup needed. The random slug is what keeps the room private in
+    // practice, since Jitsi rooms have no access control beyond the URL.
+    function generateMeetingLink() {
+      const slug = crypto.randomUUID().replace(/-/g, '').slice(0, 16);
+      return `https://meet.jit.si/HelloEducation-${slug}`;
+    }
+
+    function formatLabel(session) {
+      return session.format === 'faceToFace' ? 'Face-to-face' : 'Online';
+    }
+
+    const role = localStorage.getItem('helloEducationRole');
+    if (role !== 'tutor') {
+      window.location.href = 'login.html?role=tutor';
+    }
+
+    const app = initializeApp(firebaseConfig);
+    const auth = getAuth(app);
+    const db = getFirestore(app);
+    const welcomeMessage = document.getElementById('welcomeMessage');
+    const summaryText = document.getElementById('summaryText');
+    const requestList = document.getElementById('requestList');
+    const availabilityGrid = document.getElementById('availabilityGrid');
+    const logSessionForm = document.getElementById('logSessionForm');
+    const sessionFeedback = document.getElementById('sessionFeedback');
+    const mySessionsList = document.getElementById('mySessionsList');
+    const signOutBtn = document.getElementById('signOutBtn');
+
+    async function renderMyStudentPickers() {
+      if (!auth.currentUser) return;
+      const studentsQuery = query(collection(db, 'students'), where('tutorIds', 'array-contains', auth.currentUser.uid));
+      const snapshot = await getDocs(studentsQuery);
+      const myStudents = snapshot.docs
+        .map((docSnap) => docSnap.data())
+        .sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+
+      const pickerOptions = '<option value="">My students (optional — or type an email below)</option>' + myStudents
+        .map((s) => `<option value="${s.email}">${s.name} — ${s.email}</option>`)
+        .join('');
+      document.querySelectorAll('select[data-fill-target]').forEach((select) => {
+        select.innerHTML = pickerOptions;
+      });
+    }
+
+    document.querySelectorAll('select[data-fill-target]').forEach((select) => {
+      select.addEventListener('change', () => {
+        if (!select.value) return;
+        document.getElementById(select.dataset.fillTarget).value = select.value;
+      });
+    });
+
+    let allMySessions = [];
+
+    async function renderMySessions() {
+      if (!auth.currentUser) return;
+      const sessionsQuery = query(
+        collection(db, 'sessions'),
+        where('tutorId', '==', auth.currentUser.uid),
+        orderBy('scheduledAt', 'desc')
+      );
+      const snapshot = await getDocs(sessionsQuery);
+      allMySessions = snapshot.docs.map((docSnap) => ({ id: docSnap.id, ...docSnap.data() }));
+
+      const logged = allMySessions.filter((s) => s.status !== 'pending');
+      mySessionsList.innerHTML = logged.length
+        ? logged.map((s) => `
+          <li>
+            <span>${s.studentEmail || 'Student'} — ${s.subject} — ${s.scheduledAt.toDate().toLocaleString()} <span class="status-badge">${s.status}</span> <span class="status-badge">${formatLabel(s)}</span>${s.meetingLink ? ` — <a href="${s.meetingLink}" target="_blank" rel="noopener">Meeting link</a>` : ''}${s.notes ? `<br>${s.notes}` : ''}</span>
+            <button class="action-btn secondary" data-set-link="${s.id}" type="button">${s.meetingLink ? 'Edit link' : 'Add link'}</button>
+          </li>
+        `).join('')
+        : '<li>No sessions logged yet.</li>';
+
+      renderRequests();
+    }
+
+    function renderRequests() {
+      const pending = allMySessions.filter((s) => s.status === 'pending');
+      requestList.innerHTML = pending.length
+        ? pending.map((s) => `
+          <li>
+            <div>${s.studentEmail} — ${s.subject}: ${s.scheduledAt.toDate().toLocaleString()} <span class="status-badge">${formatLabel(s)}</span></div>
+            <div class="dashboard-actions">
+              <button class="action-btn" data-session-id="${s.id}" data-action="accept" type="button">Accept</button>
+              <button class="action-btn secondary" data-session-id="${s.id}" data-action="decline" type="button">Decline</button>
+            </div>
+          </li>
+        `).join('')
+        : '<li>No pending requests.</li>';
+    }
+
+    requestList.addEventListener('click', async (event) => {
+      const button = event.target.closest('button[data-session-id]');
+      if (!button) return;
+      const updates = { status: button.dataset.action === 'accept' ? 'scheduled' : 'cancelled' };
+      if (button.dataset.action === 'accept') {
+        updates.meetingLink = generateMeetingLink();
+      }
+      await updateDoc(doc(db, 'sessions', button.dataset.sessionId), updates);
+      await renderMySessions();
+    });
+
+    mySessionsList.addEventListener('click', async (event) => {
+      const button = event.target.closest('button[data-set-link]');
+      if (!button) return;
+      const session = allMySessions.find((s) => s.id === button.dataset.setLink);
+      const link = prompt('Meeting link for this session:', session?.meetingLink || '');
+      if (link === null) return;
+      await updateDoc(doc(db, 'sessions', button.dataset.setLink), { meetingLink: link.trim() });
+      await renderMySessions();
+    });
+
+    // A cell's key covers every hour a legacy (pre-grid) multi-hour slot
+    // spans, all pointing at that one slot's id — clicking any of those
+    // hours removes the whole original block rather than splitting it.
+    // Toggling a cell on always creates a clean new 1-hour slot, so the
+    // data naturally becomes hourly-granular as a tutor uses the grid.
+    let availabilitySlots = [];
+
+    function buildAvailabilityIndex(slots) {
+      const map = new Map();
+      slots.forEach((slot) => {
+        const [startHour] = slot.startTime.split(':').map(Number);
+        const [endHour, endMinute] = slot.endTime.split(':').map(Number);
+        const lastHour = endMinute > 0 ? endHour : endHour - 1;
+        for (let h = startHour; h <= lastHour; h++) {
+          map.set(`${slot.dayOfWeek}-${pad2(h)}:00`, slot.id);
+        }
+      });
+      return map;
+    }
+
+    function renderAvailabilityGrid() {
+      const index = buildAvailabilityIndex(availabilitySlots);
+
+      const headerRow = `<tr><th></th>${DAY_NAMES.map((d) => `<th>${d.slice(0, 3)}</th>`).join('')}</tr>`;
+      const bodyRows = AVAILABILITY_HOURS.map((hour) => {
+        const startTime = `${pad2(hour)}:00`;
+        const cells = DAY_NAMES.map((_, dayOfWeek) => {
+          const key = `${dayOfWeek}-${startTime}`;
+          const active = index.has(key);
+          return `<td><button type="button" class="availability-cell${active ? ' active' : ''}" data-day="${dayOfWeek}" data-start="${startTime}" aria-label="${DAY_NAMES[dayOfWeek]} ${hourLabel(hour)}">${active ? '✓' : ''}</button></td>`;
+        }).join('');
+        return `<tr><th>${hourLabel(hour)}</th>${cells}</tr>`;
+      }).join('');
+
+      availabilityGrid.innerHTML = `<table class="availability-grid"><thead>${headerRow}</thead><tbody>${bodyRows}</tbody></table>`;
+    }
+
+    async function renderAvailability() {
+      if (!auth.currentUser) return;
+      const availabilityQuery = query(collection(db, 'availability'), where('tutorId', '==', auth.currentUser.uid));
+      const snapshot = await getDocs(availabilityQuery);
+      availabilitySlots = snapshot.docs.map((docSnap) => ({ id: docSnap.id, ...docSnap.data() }));
+      renderAvailabilityGrid();
+    }
+
+    availabilityGrid.addEventListener('click', async (event) => {
+      const button = event.target.closest('button.availability-cell');
+      if (!button || button.disabled) return;
+
+      const dayOfWeek = Number(button.dataset.day);
+      const startTime = button.dataset.start;
+      const index = buildAvailabilityIndex(availabilitySlots);
+      const existingId = index.get(`${dayOfWeek}-${startTime}`);
+
+      button.disabled = true;
+      try {
+        if (existingId) {
+          await deleteDoc(doc(db, 'availability', existingId));
+        } else {
+          const [hour] = startTime.split(':').map(Number);
+          await addDoc(collection(db, 'availability'), {
+            tutorId: auth.currentUser.uid,
+            dayOfWeek,
+            startTime,
+            endTime: `${pad2(hour + 1)}:00`,
+            createdAt: serverTimestamp()
+          });
+        }
+        await renderAvailability();
+      } catch (error) {
+        button.disabled = false;
+        alert(error.message || 'Could not update availability.');
+      }
+    });
+
+    logSessionForm.addEventListener('submit', async (event) => {
+      event.preventDefault();
+      sessionFeedback.textContent = 'Saving…';
+
+      const studentEmail = document.getElementById('sessionStudentEmail').value.trim();
+      const subject = document.getElementById('sessionSubject').value.trim();
+      const dateTimeValue = document.getElementById('sessionDateTime').value;
+      const format = document.getElementById('sessionFormat').value;
+      const status = document.getElementById('sessionStatus').value;
+      const notes = document.getElementById('sessionNotes').value.trim();
+
+      try {
+        const studentQuery = query(collection(db, 'users'), where('email', '==', studentEmail), where('role', '==', 'student'));
+        const studentSnap = await getDocs(studentQuery);
+
+        if (studentSnap.empty) {
+          sessionFeedback.textContent = 'No student account found with that email.';
+          return;
+        }
+
+        await addDoc(collection(db, 'sessions'), {
+          studentId: studentSnap.docs[0].id,
+          studentEmail,
+          tutorId: auth.currentUser.uid,
+          subject,
+          scheduledAt: Timestamp.fromDate(new Date(dateTimeValue)),
+          status,
+          format,
+          notes,
+          meetingLink: status === 'scheduled' ? generateMeetingLink() : null,
+          createdAt: serverTimestamp()
+        });
+
+        sessionFeedback.textContent = 'Session saved.';
+        logSessionForm.reset();
+        await renderMySessions();
+      } catch (error) {
+        sessionFeedback.textContent = error.message || 'Could not save this session. Please try again.';
+      }
+    });
+
+    onAuthStateChanged(auth, async (user) => {
+      if (!user && !isFirebaseConfigured()) {
+        welcomeMessage.textContent = 'Schedule';
+        summaryText.textContent = 'Demo mode is active. Connect Firebase to see real data.';
+        return;
+      }
+
+      if (!user) {
+        window.location.href = 'login.html?role=tutor';
+        return;
+      }
+
+      renderMyStudentPickers();
+      renderAvailability();
+      renderMySessions();
+    });
+
+    signOutBtn.addEventListener('click', async () => {
+      if (!isFirebaseConfigured()) {
+        localStorage.removeItem('helloEducationRole');
+        localStorage.removeItem('helloEducationUser');
+        window.location.href = 'login.html?role=tutor';
+        return;
+      }
+
+      await signOut(auth);
+    });
+  </script>
+  <script>
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('sw.js').catch(() => {});
+      });
+    }
+  </script>
+</body>
+</html>

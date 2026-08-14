@@ -1,0 +1,418 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>HelloEducation Tutor — Second Chance</title>
+  <link rel="stylesheet" href="styling.css" />
+  <link rel="manifest" href="manifest.json" />
+  <link rel="icon" href="favicon.ico" />
+  <link rel="apple-touch-icon" href="icons/apple-touch-icon.png" />
+  <meta name="theme-color" content="#3074f3" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="HelloEducation" />
+</head>
+<body>
+  <header>
+    <h1>HelloEducation</h1>
+    <h1 class="page-heading">Tutor — Second Chance</h1>
+  </header>
+
+  <navigation>
+    <ul>
+      <li><a href="index.html">Home</a></li>
+      <li><a href="services.html">Services</a></li>
+      <li><a href="tutors.html">Tutors</a></li>
+      <li><a href="contact.html">Contact</a></li>
+    </ul>
+  </navigation>
+
+  <main class="auth-page">
+    <section class="auth-panel dashboard-panel">
+      <div class="admin-subnav">
+        <a href="tutor-dashboard.html">Overview</a>
+        <a href="tutor-schedule.html">Schedule</a>
+        <a href="tutor-students.html">Students</a>
+        <a href="tutor-materials.html">Materials</a>
+        <a href="tutor-second-chance.html" class="active">Second Chance</a>
+      </div>
+
+      <h2 id="welcomeMessage">Second Chance</h2>
+      <p id="summaryText">Your Second Chance Programme class slots, tasks, resources, and questions.</p>
+
+      <div class="dashboard-card">
+        <h3>My Second Chance classes</h3>
+        <p class="card-hint">Your fixed weekly class slots for the Second Chance Programme (matric re-write).</p>
+        <ul id="matricGroupsList"><li>Loading…</li></ul>
+      </div>
+
+      <div class="dashboard-grid dashboard-grid-2">
+        <div class="dashboard-card">
+          <h3>Share a Second Chance study resource</h3>
+          <form id="matricResourceForm" class="admin-form">
+            <input id="matricResourceStudentEmail" type="email" placeholder="Student email" required />
+            <input id="matricResourceTitle" type="text" placeholder="Title (e.g. Maths formula sheet)" required />
+            <input id="matricResourceType" type="text" placeholder="Type (e.g. PDF, Link, Worksheet)" required />
+            <input id="matricResourceUrl" type="url" placeholder="Link (optional)" />
+            <label class="card-hint" for="matricResourceFile">Or upload a file (PDF, Word, PowerPoint, image — max 10MB)</label>
+            <input id="matricResourceFile" type="file" accept=".pdf,.doc,.docx,.ppt,.pptx,.xls,.xlsx,image/*" />
+            <button type="submit">Share</button>
+          </form>
+          <p class="auth-feedback" id="matricResourceFeedback"></p>
+        </div>
+        <div class="dashboard-card">
+          <h3>Second Chance resources I've shared</h3>
+          <ul id="matricResourcesList"><li>Loading…</li></ul>
+        </div>
+      </div>
+
+      <div class="dashboard-grid dashboard-grid-2">
+        <div class="dashboard-card">
+          <h3>Give a Second Chance task/assessment</h3>
+          <p class="card-hint">Assigns to every student in the chosen class slot.</p>
+          <form id="matricAssignForm" class="admin-form">
+            <select id="matricAssignGroup" required><option value="">Choose a class slot…</option></select>
+            <input id="matricAssignTitle" type="text" placeholder="Title" required />
+            <textarea id="matricAssignDescription" placeholder="Instructions (optional)" rows="2"></textarea>
+            <select id="matricAssignType" required>
+              <option value="task">Task</option>
+              <option value="assessment">Assessment</option>
+            </select>
+            <input id="matricAssignDue" type="datetime-local" required />
+            <label class="card-hint" for="matricAssignFile">Attach a file (optional, max 10MB)</label>
+            <input id="matricAssignFile" type="file" accept=".pdf,.doc,.docx,.ppt,.pptx,.xls,.xlsx,image/*" />
+            <button type="submit">Assign</button>
+          </form>
+          <p class="auth-feedback" id="matricAssignFeedback"></p>
+        </div>
+        <div class="dashboard-card">
+          <h3>Second Chance tasks/assessments I've given</h3>
+          <ul id="matricAssignmentsList"><li>Loading…</li></ul>
+        </div>
+      </div>
+
+      <div class="dashboard-card">
+        <h3>Second Chance questions from students</h3>
+        <ul id="matricQuestionsList"><li>Loading…</li></ul>
+      </div>
+
+      <button id="signOutBtn" type="button">Sign Out</button>
+    </section>
+  </main>
+
+  <footer>
+    <p>&copy; 2023 HelloEducation. All rights reserved.</p>
+  </footer>
+
+  <script type="module">
+    import { initializeApp } from 'https://www.gstatic.com/firebasejs/12.4.0/firebase-app.js';
+    import { getAuth, onAuthStateChanged, signOut } from 'https://www.gstatic.com/firebasejs/12.4.0/firebase-auth.js';
+    import { getFirestore, collection, query, where, getDocs, getDoc, addDoc, deleteDoc, updateDoc, doc, Timestamp, serverTimestamp, writeBatch } from 'https://www.gstatic.com/firebasejs/12.4.0/firebase-firestore.js';
+    import { getStorage, ref, uploadBytes, getDownloadURL } from 'https://www.gstatic.com/firebasejs/12.4.0/firebase-storage.js';
+    import { firebaseConfig, isFirebaseConfigured } from './firebase-config.js';
+
+    const DAY_NAMES = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+
+    const role = localStorage.getItem('helloEducationRole');
+    if (role !== 'tutor') {
+      window.location.href = 'login.html?role=tutor';
+    }
+
+    const app = initializeApp(firebaseConfig);
+    const auth = getAuth(app);
+    const db = getFirestore(app);
+    const storage = getStorage(app);
+    const welcomeMessage = document.getElementById('welcomeMessage');
+    const summaryText = document.getElementById('summaryText');
+    const matricGroupsList = document.getElementById('matricGroupsList');
+    const matricResourcesList = document.getElementById('matricResourcesList');
+    const matricAssignForm = document.getElementById('matricAssignForm');
+    const matricAssignGroup = document.getElementById('matricAssignGroup');
+    const matricAssignFeedback = document.getElementById('matricAssignFeedback');
+    const matricAssignmentsList = document.getElementById('matricAssignmentsList');
+    const matricQuestionsList = document.getElementById('matricQuestionsList');
+    const signOutBtn = document.getElementById('signOutBtn');
+
+    function toDateKey(d) {
+      const y = d.getFullYear();
+      const m = String(d.getMonth() + 1).padStart(2, '0');
+      const day = String(d.getDate()).padStart(2, '0');
+      return `${y}-${m}-${day}`;
+    }
+
+    function nextOccurrences(dayOfWeek, count) {
+      const dates = [];
+      const cursor = new Date();
+      cursor.setHours(0, 0, 0, 0);
+      while (dates.length < count) {
+        if (cursor.getDay() === dayOfWeek) dates.push(new Date(cursor));
+        cursor.setDate(cursor.getDate() + 1);
+      }
+      return dates;
+    }
+
+    let allMyMatricGroups = [];
+    let matricStudentById = {};
+
+    async function renderMyMatricGroups() {
+      if (!auth.currentUser) return;
+      const groupsQuery = query(collection(db, 'matricGroups'), where('tutorId', '==', auth.currentUser.uid));
+      const snapshot = await getDocs(groupsQuery);
+      allMyMatricGroups = snapshot.docs
+        .map((docSnap) => ({ id: docSnap.id, ...docSnap.data() }))
+        .sort((a, b) => a.dayOfWeek - b.dayOfWeek || a.startTime.localeCompare(b.startTime));
+
+      const studentIds = [...new Set(allMyMatricGroups.flatMap((g) => g.studentIds || []))];
+      matricStudentById = {};
+      await Promise.all(studentIds.map(async (uid) => {
+        const snap = await getDoc(doc(db, 'matricStudents', uid));
+        if (snap.exists()) matricStudentById[uid] = snap.data();
+      }));
+
+      matricGroupsList.innerHTML = allMyMatricGroups.length
+        ? allMyMatricGroups.map((g) => {
+          const roster = (g.studentIds || []).map((uid) => matricStudentById[uid]?.email || uid).join(', ') || 'No students enrolled yet';
+          const upcoming = nextOccurrences(g.dayOfWeek, 3)
+            .map((date) => `<a class="week-event" href="matric-session.html?groupId=${g.id}&date=${toDateKey(date)}">${date.toLocaleDateString(undefined, { day: 'numeric', month: 'short' })}</a>`)
+            .join('');
+          return `<li><strong>${g.subject}</strong> — ${DAY_NAMES[g.dayOfWeek]} ${g.startTime}–${g.endTime} <span class="status-badge">${(g.studentIds || []).length}/${g.capacity || 4}</span>${g.meetingLink ? ` — <a href="${g.meetingLink}" target="_blank" rel="noopener">Join session</a>` : ''}<br>${roster}<div class="card-hint">Add materials for an upcoming session:</div><div class="dashboard-actions">${upcoming}</div></li>`;
+        }).join('')
+        : '<li>No Second Chance class slots assigned to you yet.</li>';
+
+      matricAssignGroup.innerHTML = '<option value="">Choose a class slot…</option>' + allMyMatricGroups
+        .map((g) => `<option value="${g.id}">${g.subject} — ${DAY_NAMES[g.dayOfWeek]} ${g.startTime}–${g.endTime}</option>`)
+        .join('');
+    }
+
+    async function renderMatricResources() {
+      if (!auth.currentUser) return;
+      const resourcesQuery = query(collection(db, 'matricStudyResources'), where('createdBy', '==', auth.currentUser.uid));
+      const snapshot = await getDocs(resourcesQuery);
+      const resources = snapshot.docs
+        .map((docSnap) => ({ id: docSnap.id, ...docSnap.data() }))
+        .sort((a, b) => (b.createdAt?.toMillis() || 0) - (a.createdAt?.toMillis() || 0));
+
+      matricResourcesList.innerHTML = resources.length
+        ? resources.map((r) => `
+          <li>
+            <span>${r.title} — ${r.studentEmail || 'Student'} <span class="status-badge">${r.type}</span>${r.url ? ` — <a href="${r.url}" target="_blank" rel="noopener">Open</a>` : ''}</span>
+            <button class="action-btn secondary" data-remove-resource="${r.id}" type="button">Remove</button>
+          </li>
+        `).join('')
+        : '<li>Nothing shared yet.</li>';
+    }
+
+    matricResourcesList.addEventListener('click', async (event) => {
+      const button = event.target.closest('button[data-remove-resource]');
+      if (!button) return;
+      if (!confirm('Remove this resource?')) return;
+      await deleteDoc(doc(db, 'matricStudyResources', button.dataset.removeResource));
+      await renderMatricResources();
+    });
+
+    document.getElementById('matricResourceForm').addEventListener('submit', async (event) => {
+      event.preventDefault();
+      const matricResourceFeedback = document.getElementById('matricResourceFeedback');
+      matricResourceFeedback.textContent = 'Sharing…';
+
+      const studentEmail = document.getElementById('matricResourceStudentEmail').value.trim();
+      const title = document.getElementById('matricResourceTitle').value.trim();
+      const type = document.getElementById('matricResourceType').value.trim();
+      let url = document.getElementById('matricResourceUrl').value.trim();
+      const file = document.getElementById('matricResourceFile').files[0];
+
+      try {
+        const studentQuery = query(collection(db, 'matricStudents'), where('email', '==', studentEmail));
+        const studentSnap = await getDocs(studentQuery);
+
+        if (studentSnap.empty) {
+          matricResourceFeedback.textContent = 'No Second Chance student found with that email.';
+          return;
+        }
+
+        if (file) {
+          matricResourceFeedback.textContent = 'Uploading…';
+          const fileRef = ref(storage, `study-resources/${auth.currentUser.uid}/${Date.now()}-${file.name}`);
+          await uploadBytes(fileRef, file);
+          url = await getDownloadURL(fileRef);
+        }
+
+        await addDoc(collection(db, 'matricStudyResources'), {
+          studentId: studentSnap.docs[0].id,
+          studentEmail,
+          title,
+          type,
+          url: url || null,
+          createdBy: auth.currentUser.uid,
+          createdAt: serverTimestamp()
+        });
+
+        matricResourceFeedback.textContent = 'Shared.';
+        event.target.reset();
+        await renderMatricResources();
+      } catch (error) {
+        matricResourceFeedback.textContent = error.message || 'Could not share this. Please try again.';
+      }
+    });
+
+    async function renderMyMatricAssignments() {
+      if (!auth.currentUser) return;
+      const assignmentsQuery = query(collection(db, 'matricAssignments'), where('createdBy', '==', auth.currentUser.uid));
+      const snapshot = await getDocs(assignmentsQuery);
+      const assignments = snapshot.docs
+        .map((docSnap) => ({ id: docSnap.id, ...docSnap.data() }))
+        .sort((a, b) => (b.createdAt?.toMillis() || 0) - (a.createdAt?.toMillis() || 0));
+
+      matricAssignmentsList.innerHTML = assignments.length
+        ? assignments.map((a) => `
+          <li>
+            <strong>${a.title}</strong> — ${a.studentEmail || 'Student'} <span class="status-badge">${a.type}</span> <span class="status-badge">${a.status}</span>
+            ${a.dueAt ? `<br>Due: ${a.dueAt.toDate().toLocaleString()}` : ''}
+            ${a.attachmentUrl ? `<br>Attachment: <a href="${a.attachmentUrl}" target="_blank" rel="noopener">${a.attachmentName || 'View file'}</a>` : ''}
+            ${a.status !== 'assigned' ? `<br>Submission: ${a.submissionNote || '(no note)'}${a.fileUrl ? ` — <a href="${a.fileUrl}" target="_blank" rel="noopener">${a.fileName}</a>` : ''}` : ''}
+          </li>
+        `).join('')
+        : '<li>No Second Chance tasks/assessments given yet.</li>';
+    }
+
+    matricAssignForm.addEventListener('submit', async (event) => {
+      event.preventDefault();
+      matricAssignFeedback.textContent = 'Assigning…';
+
+      const groupId = matricAssignGroup.value;
+      const group = allMyMatricGroups.find((g) => g.id === groupId);
+      const title = document.getElementById('matricAssignTitle').value.trim();
+      const description = document.getElementById('matricAssignDescription').value.trim();
+      const type = document.getElementById('matricAssignType').value;
+      const dueValue = document.getElementById('matricAssignDue').value;
+
+      if (!group || !group.studentIds || !group.studentIds.length) {
+        matricAssignFeedback.textContent = 'That class slot has no students enrolled yet.';
+        return;
+      }
+
+      try {
+        const file = document.getElementById('matricAssignFile').files[0];
+        let attachmentUrl = null;
+        let attachmentName = null;
+        if (file) {
+          matricAssignFeedback.textContent = 'Uploading…';
+          const fileRef = ref(storage, `study-resources/${auth.currentUser.uid}/${Date.now()}-${file.name}`);
+          await uploadBytes(fileRef, file);
+          attachmentUrl = await getDownloadURL(fileRef);
+          attachmentName = file.name;
+        }
+
+        const batch = writeBatch(db);
+        group.studentIds.forEach((studentId) => {
+          const student = matricStudentById[studentId];
+          batch.set(doc(collection(db, 'matricAssignments')), {
+            groupId,
+            subject: group.subject,
+            studentId,
+            studentEmail: student ? student.email : '',
+            title,
+            description,
+            attachmentUrl,
+            attachmentName,
+            type,
+            dueAt: Timestamp.fromDate(new Date(dueValue)),
+            status: 'assigned',
+            submissionNote: '',
+            fileUrl: null,
+            fileName: null,
+            feedback: '',
+            createdBy: auth.currentUser.uid,
+            createdAt: serverTimestamp()
+          });
+        });
+        await batch.commit();
+
+        matricAssignFeedback.textContent = `Assigned to ${group.studentIds.length} student(s).`;
+        matricAssignForm.reset();
+        await renderMyMatricAssignments();
+      } catch (error) {
+        matricAssignFeedback.textContent = error.message || 'Could not assign this. Please try again.';
+      }
+    });
+
+    async function renderMatricQuestions() {
+      if (!auth.currentUser) return;
+      const questionsQuery = query(collection(db, 'matricQuestions'), where('tutorId', '==', auth.currentUser.uid));
+      const snapshot = await getDocs(questionsQuery);
+      const questions = snapshot.docs
+        .map((docSnap) => ({ id: docSnap.id, ...docSnap.data() }))
+        .sort((a, b) => (b.createdAt?.toMillis() || 0) - (a.createdAt?.toMillis() || 0));
+
+      matricQuestionsList.innerHTML = questions.length
+        ? questions.map((q) => `
+          <li>
+            <div>
+              <strong>${q.subject}</strong> — ${q.studentEmail} <span class="status-badge">${q.status}</span>
+              <br>${q.message}
+              ${q.reply ? `<br>Your reply: ${q.reply}` : ''}
+            </div>
+            ${q.status === 'open' ? `
+              <div class="dashboard-actions">
+                <input type="text" placeholder="Reply" data-reply-input="${q.id}" />
+                <button class="action-btn" data-send-reply="${q.id}" type="button">Send reply</button>
+              </div>
+            ` : ''}
+          </li>
+        `).join('')
+        : '<li>No questions yet.</li>';
+    }
+
+    matricQuestionsList.addEventListener('click', async (event) => {
+      const button = event.target.closest('button[data-send-reply]');
+      if (!button) return;
+      const replyInput = matricQuestionsList.querySelector(`input[data-reply-input="${button.dataset.sendReply}"]`);
+      const reply = replyInput.value.trim();
+      if (!reply) return;
+      await updateDoc(doc(db, 'matricQuestions', button.dataset.sendReply), {
+        reply,
+        status: 'answered',
+        repliedAt: serverTimestamp()
+      });
+      await renderMatricQuestions();
+    });
+
+    onAuthStateChanged(auth, async (user) => {
+      if (!user && !isFirebaseConfigured()) {
+        welcomeMessage.textContent = 'Second Chance';
+        summaryText.textContent = 'Demo mode is active. Connect Firebase to see real data.';
+        return;
+      }
+
+      if (!user) {
+        window.location.href = 'login.html?role=tutor';
+        return;
+      }
+
+      renderMyMatricGroups();
+      renderMatricResources();
+      renderMyMatricAssignments();
+      renderMatricQuestions();
+    });
+
+    signOutBtn.addEventListener('click', async () => {
+      if (!isFirebaseConfigured()) {
+        localStorage.removeItem('helloEducationRole');
+        localStorage.removeItem('helloEducationUser');
+        window.location.href = 'login.html?role=tutor';
+        return;
+      }
+
+      await signOut(auth);
+    });
+  </script>
+  <script>
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('sw.js').catch(() => {});
+      });
+    }
+  </script>
+</body>
+</html>

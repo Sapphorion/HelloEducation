@@ -68,7 +68,8 @@
             <input id="newAccountSubject" type="text" placeholder="Subject" class="tutor-only" />
             <textarea id="newAccountBio" placeholder="Short bio" rows="2" class="tutor-only"></textarea>
             <input id="newAccountGrade" type="text" placeholder="Grade" class="student-only" />
-            <input id="newAccountChildren" type="text" placeholder="Linked student email(s), comma-separated" class="parent-only" />
+            <label class="card-hint parent-only" for="newAccountChildren">Linked student(s) — hold Ctrl (Windows) or Cmd (Mac) to select more than one</label>
+            <select id="newAccountChildren" multiple size="4" class="parent-only"></select>
             <button type="submit">Create account</button>
           </form>
           <p class="card-hint">Account creation takes a few seconds — it creates the sign-in, writes their profile, and sends a welcome email in sequence, so the button doesn't feel instant. That's normal.</p>
@@ -211,6 +212,13 @@
     }
 
     let tutorNameById = {};
+    let allStudents = [];
+
+    function populateChildrenSelect() {
+      document.getElementById('newAccountChildren').innerHTML = allStudents
+        .map((s) => `<option value="${s.email}">${s.name} — ${s.email}</option>`)
+        .join('');
+    }
 
     async function renderStudentTutorAssignment() {
       const [studentsSnap, tutorsSnap] = await Promise.all([
@@ -218,6 +226,8 @@
         getDocs(collection(db, 'tutors'))
       ]);
 
+      allStudents = studentsSnap.docs.map((d) => ({ id: d.id, ...d.data() }))
+        .sort((a, b) => (a.name || '').localeCompare(b.name || ''));
       tutorNameById = Object.fromEntries(tutorsSnap.docs.map((d) => [d.id, d.data().name]));
 
       assignTutorStudent.innerHTML = '<option value="">Choose a student…</option>' + studentsSnap.docs
@@ -226,6 +236,7 @@
       assignTutorTutor.innerHTML = '<option value="">Choose a tutor…</option>' + tutorsSnap.docs
         .map((d) => `<option value="${d.id}">${d.data().name} — ${d.data().subject}</option>`)
         .join('');
+      populateChildrenSelect();
 
       const assigned = studentsSnap.docs
         .map((d) => ({ id: d.id, ...d.data() }))
@@ -397,7 +408,8 @@
         </div>
         ${currentData.role === 'parent' ? `
           <form id="editChildrenForm" class="admin-form">
-            <input id="editChildrenEmails" type="text" placeholder="Linked student email(s), comma-separated" value="" />
+            <p class="card-hint">Hold Ctrl (Windows) or Cmd (Mac) to select more than one.</p>
+            <select id="editChildrenSelect" multiple size="4">${allStudents.map((s) => `<option value="${s.id}" ${(currentData.childUids || []).includes(s.id) ? 'selected' : ''}>${s.name} — ${s.email}</option>`).join('')}</select>
             <button type="submit">Update linked children</button>
           </form>
         ` : ''}
@@ -419,23 +431,9 @@
       if (editChildrenForm) {
         editChildrenForm.addEventListener('submit', async (event) => {
           event.preventDefault();
-          const emails = document.getElementById('editChildrenEmails').value
-            .split(',').map((e) => e.trim()).filter(Boolean);
-
-          const childUids = [];
-          const notFound = [];
-          for (const childEmail of emails) {
-            const childQuery = query(collection(db, 'users'), where('email', '==', childEmail), where('role', '==', 'student'));
-            const childSnap = await getDocs(childQuery);
-            if (childSnap.empty) {
-              notFound.push(childEmail);
-            } else {
-              childUids.push(childSnap.docs[0].id);
-            }
-          }
-
+          const childUids = Array.from(document.getElementById('editChildrenSelect').selectedOptions).map((o) => o.value);
           await updateDoc(doc(db, 'users', userDocSnap.id), { childUids });
-          roleLookupResult.innerHTML = `<p>Linked ${childUids.length} student(s).${notFound.length ? ` Not found: ${notFound.join(', ')}` : ''}</p>`;
+          roleLookupResult.innerHTML = `<p>Linked ${childUids.length} student(s).</p>`;
         });
       }
     });
@@ -451,8 +449,7 @@
       const subject = document.getElementById('newAccountSubject').value.trim();
       const bio = document.getElementById('newAccountBio').value.trim();
       const grade = document.getElementById('newAccountGrade').value.trim();
-      const childEmails = document.getElementById('newAccountChildren').value
-        .split(',').map((e) => e.trim()).filter(Boolean);
+      const childEmails = Array.from(document.getElementById('newAccountChildren').selectedOptions).map((o) => o.value);
 
       try {
         const response = await createAccountCallable({ email, password, name, role, subject, bio, grade, childEmails });
