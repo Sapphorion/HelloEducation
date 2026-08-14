@@ -613,6 +613,7 @@ exports.askAI = onCall({ secrets: [anthropicApiKey] }, async (request) => {
     const textBlock = response.content.find((block) => block.type === 'text');
     replyText = textBlock ? textBlock.text : "Sorry, I couldn't come up with a response — try asking again.";
   } catch (error) {
+    console.error('askAI failed:', error.message || error);
     throw new HttpsError('internal', 'Could not reach the AI assistant. Please try again in a moment.');
   }
 
@@ -735,6 +736,7 @@ exports.generateMaterial = onCall({ secrets: [anthropicApiKey] }, async (request
       output_config: { format: materialOutputFormat(type) }
     });
   } catch (error) {
+    console.error('generateMaterial failed:', error.message || error);
     throw new HttpsError('internal', 'Could not generate the material. Please try again.');
   }
 
