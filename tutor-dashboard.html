@@ -60,9 +60,16 @@
       </div>
 
       <div class="dashboard-card">
+        <h3>My students</h3>
+        <p class="card-hint">Students admin has assigned to you. This is just a roster — you can still work with any student by email, assigned or not.</p>
+        <ul id="myStudentsList"><li>Loading…</li></ul>
+      </div>
+
+      <div class="dashboard-card">
         <h3>Log a session</h3>
         <p class="card-hint">This is what students and their linked parents see as schedule and progress/feedback. Leave notes blank for an upcoming session, or fill them in once it's done. Scheduled sessions get a video call link automatically — no need to create one yourself.</p>
         <form id="logSessionForm" class="admin-form">
+          <select id="sessionStudentPicker" data-fill-target="sessionStudentEmail"><option value="">My students (optional — or type an email below)</option></select>
           <input id="sessionStudentEmail" type="email" placeholder="Student email" required />
           <input id="sessionSubject" type="text" placeholder="Subject" required />
           <input id="sessionDateTime" type="datetime-local" required />
@@ -91,6 +98,7 @@
           <h3>Share a study resource</h3>
           <p class="card-hint">To share an AI-generated material, copy its link from "My materials" below into the link field below.</p>
           <form id="resourceForm" class="admin-form">
+            <select id="resourceStudentPicker" data-fill-target="resourceStudentEmail"><option value="">My students (optional — or type an email below)</option></select>
             <input id="resourceStudentEmail" type="email" placeholder="Student email" required />
             <input id="resourceTitle" type="text" placeholder="Title (e.g. GCSE Maths formula sheet)" required />
             <input id="resourceType" type="text" placeholder="Type (e.g. PDF, Link, Worksheet)" required />
@@ -112,6 +120,7 @@
           <h3>Assign work</h3>
           <p class="card-hint">Shows up on the student's "Today's focus" list. They can submit a note and/or a file back to you.</p>
           <form id="assignForm" class="admin-form">
+            <select id="assignStudentPicker" data-fill-target="assignStudentEmail"><option value="">My students (optional — or type an email below)</option></select>
             <input id="assignStudentEmail" type="email" placeholder="Student email" required />
             <input id="assignTitle" type="text" placeholder="Title (e.g. Algebra worksheet)" required />
             <textarea id="assignDescription" placeholder="Instructions (optional)" rows="2"></textarea>
@@ -266,6 +275,7 @@
     const materialFeedback = document.getElementById('materialFeedback');
     const materialsList = document.getElementById('materialsList');
     const requestList = document.getElementById('requestList');
+    const myStudentsList = document.getElementById('myStudentsList');
     const availabilityList = document.getElementById('availabilityList');
     const availabilityForm = document.getElementById('availabilityForm');
     const logSessionForm = document.getElementById('logSessionForm');
@@ -804,6 +814,33 @@
       await renderAssignments();
     });
 
+    async function renderMyStudents() {
+      if (!auth.currentUser) return;
+      const studentsQuery = query(collection(db, 'students'), where('tutorIds', 'array-contains', auth.currentUser.uid));
+      const snapshot = await getDocs(studentsQuery);
+      const myStudents = snapshot.docs
+        .map((docSnap) => ({ id: docSnap.id, ...docSnap.data() }))
+        .sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+
+      myStudentsList.innerHTML = myStudents.length
+        ? myStudents.map((s) => `<li>${s.name} — ${s.email}</li>`).join('')
+        : '<li>No students assigned to you yet — you can still work with any student by email.</li>';
+
+      const pickerOptions = '<option value="">My students (optional — or type an email below)</option>' + myStudents
+        .map((s) => `<option value="${s.email}">${s.name} — ${s.email}</option>`)
+        .join('');
+      document.querySelectorAll('select[data-fill-target]').forEach((select) => {
+        select.innerHTML = pickerOptions;
+      });
+    }
+
+    document.querySelectorAll('select[data-fill-target]').forEach((select) => {
+      select.addEventListener('change', () => {
+        if (!select.value) return;
+        document.getElementById(select.dataset.fillTarget).value = select.value;
+      });
+    });
+
     let allMySessions = [];
 
     async function renderMySessions() {
@@ -957,6 +994,7 @@
 
       const userDocSnap = await getDoc(doc(db, 'users', user.uid));
       welcomeMessage.textContent = `Welcome back, ${(userDocSnap.exists() && userDocSnap.data().name) || user.email || 'tutor'}!`;
+      renderMyStudents();
       renderMySessions();
       renderAvailability();
       renderAssignments();

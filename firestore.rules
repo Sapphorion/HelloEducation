@@ -62,7 +62,10 @@ service cloud.firestore {
     }
 
     match /students/{studentId} {
-      allow read: if signedIn() && (request.auth.uid == studentId || isAdmin(request.auth.uid) || isParentOf(studentId));
+      // isTutor() here lets a tutor query "my students" (tutorIds
+      // array-contains their uid) — same reasoning as the users/
+      // matricStudents read rules above.
+      allow read: if signedIn() && (request.auth.uid == studentId || isAdmin(request.auth.uid) || isParentOf(studentId) || isTutor(request.auth.uid));
       allow create, update: if signedIn() && (request.auth.uid == studentId || isAdmin(request.auth.uid));
       allow delete: if isAdmin(request.auth.uid);
     }

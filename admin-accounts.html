@@ -82,6 +82,18 @@
       </div>
 
       <div class="dashboard-card">
+        <h3>Assign a student to a tutor</h3>
+        <p class="card-hint">A student can be assigned to more than one tutor. This is just a roster/reference — it lets a tutor see "My students" and doesn't stop them working with any other student.</p>
+        <form id="assignTutorForm" class="admin-form">
+          <select id="assignTutorStudent" required><option value="">Choose a student…</option></select>
+          <select id="assignTutorTutor" required><option value="">Choose a tutor…</option></select>
+          <button type="submit">Assign</button>
+        </form>
+        <p class="auth-feedback" id="assignTutorFeedback"></p>
+        <ul id="studentTutorList"><li>Loading…</li></ul>
+      </div>
+
+      <div class="dashboard-card">
         <h3>All accounts</h3>
         <p class="card-hint">Every account on the platform. Change a role, disable sign-in without losing their data, or permanently delete an account.</p>
         <div class="accounts-filter">
@@ -113,7 +125,7 @@
   <script type="module">
     import { initializeApp } from 'https://www.gstatic.com/firebasejs/12.4.0/firebase-app.js';
     import { getAuth, onAuthStateChanged, signOut } from 'https://www.gstatic.com/firebasejs/12.4.0/firebase-auth.js';
-    import { getFirestore, collection, query, where, getDocs, updateDoc, setDoc, doc, deleteDoc } from 'https://www.gstatic.com/firebasejs/12.4.0/firebase-firestore.js';
+    import { getFirestore, collection, query, where, getDocs, updateDoc, setDoc, doc, deleteDoc, arrayUnion, arrayRemove } from 'https://www.gstatic.com/firebasejs/12.4.0/firebase-firestore.js';
     import { getFunctions, httpsCallable } from 'https://www.gstatic.com/firebasejs/12.4.0/firebase-functions.js';
     import { firebaseConfig, isFirebaseConfigured } from './firebase-config.js';
 
@@ -161,6 +173,11 @@
     const createAccountResult = document.getElementById('createAccountResult');
     const newAccountRole = document.getElementById('newAccountRole');
     const tutorDirectory = document.getElementById('tutorDirectory');
+    const assignTutorForm = document.getElementById('assignTutorForm');
+    const assignTutorStudent = document.getElementById('assignTutorStudent');
+    const assignTutorTutor = document.getElementById('assignTutorTutor');
+    const assignTutorFeedback = document.getElementById('assignTutorFeedback');
+    const studentTutorList = document.getElementById('studentTutorList');
     const accountsDirectory = document.getElementById('accountsDirectory');
     const accountsSearch = document.getElementById('accountsSearch');
     const accountsRoleFilter = document.getElementById('accountsRoleFilter');
@@ -192,6 +209,64 @@
         `;
       }).join('');
     }
+
+    let tutorNameById = {};
+
+    async function renderStudentTutorAssignment() {
+      const [studentsSnap, tutorsSnap] = await Promise.all([
+        getDocs(collection(db, 'students')),
+        getDocs(collection(db, 'tutors'))
+      ]);
+
+      tutorNameById = Object.fromEntries(tutorsSnap.docs.map((d) => [d.id, d.data().name]));
+
+      assignTutorStudent.innerHTML = '<option value="">Choose a student…</option>' + studentsSnap.docs
+        .map((d) => `<option value="${d.id}">${d.data().name} — ${d.data().email}</option>`)
+        .join('');
+      assignTutorTutor.innerHTML = '<option value="">Choose a tutor…</option>' + tutorsSnap.docs
+        .map((d) => `<option value="${d.id}">${d.data().name} — ${d.data().subject}</option>`)
+        .join('');
+
+      const assigned = studentsSnap.docs
+        .map((d) => ({ id: d.id, ...d.data() }))
+        .filter((s) => (s.tutorIds || []).length > 0)
+        .sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+
+      studentTutorList.innerHTML = assigned.length
+        ? assigned.map((s) => `
+          <li>
+            <div><strong>${s.name}</strong> — ${s.email}</div>
+            <div class="dashboard-actions">
+              ${(s.tutorIds || []).map((tutorId) => `<button class="action-btn secondary" data-unassign-student="${s.id}" data-unassign-tutor="${tutorId}" type="button">Remove ${tutorNameById[tutorId] || 'tutor'}</button>`).join('')}
+            </div>
+          </li>
+        `).join('')
+        : '<li>No students assigned to a tutor yet.</li>';
+    }
+
+    assignTutorForm.addEventListener('submit', async (event) => {
+      event.preventDefault();
+      assignTutorFeedback.textContent = 'Assigning…';
+
+      const studentId = assignTutorStudent.value;
+      const tutorId = assignTutorTutor.value;
+
+      try {
+        await updateDoc(doc(db, 'students', studentId), { tutorIds: arrayUnion(tutorId) });
+        assignTutorFeedback.textContent = 'Assigned.';
+        assignTutorForm.reset();
+        await renderStudentTutorAssignment();
+      } catch (error) {
+        assignTutorFeedback.textContent = error.message || 'Could not assign this student.';
+      }
+    });
+
+    studentTutorList.addEventListener('click', async (event) => {
+      const button = event.target.closest('button[data-unassign-student]');
+      if (!button) return;
+      await updateDoc(doc(db, 'students', button.dataset.unassignStudent), { tutorIds: arrayRemove(button.dataset.unassignTutor) });
+      await renderStudentTutorAssignment();
+    });
 
     let allAccounts = [];
 
@@ -273,6 +348,7 @@
         await ensureRoleProfileDoc(uid, newRole, account?.name || '', account?.email || '');
         await renderAccountsDirectory();
         await renderTutorDirectory();
+        await renderStudentTutorAssignment();
         return;
       }
 
@@ -290,6 +366,7 @@
         await deleteAccountCallable({ uid });
         await renderAccountsDirectory();
         await renderTutorDirectory();
+        await renderStudentTutorAssignment();
       }
     });
 
@@ -392,6 +469,9 @@
         if (role === 'tutor') {
           await renderTutorDirectory();
         }
+        if (role === 'tutor' || role === 'student') {
+          await renderStudentTutorAssignment();
+        }
         await renderAccountsDirectory();
       } catch (error) {
         createAccountResult.innerHTML = `<p>${error.message || 'Could not create the account.'}</p>`;
@@ -403,6 +483,7 @@
       if (!button) return;
       await deleteDoc(doc(db, 'tutors', button.dataset.tutorId));
       await renderTutorDirectory();
+      await renderStudentTutorAssignment();
     });
 
     onAuthStateChanged(auth, async (user) => {
@@ -419,6 +500,7 @@
 
       renderTutorDirectory();
       renderAccountsDirectory();
+      renderStudentTutorAssignment();
     });
 
     signOutBtn.addEventListener('click', async () => {
