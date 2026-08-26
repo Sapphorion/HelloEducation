@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>HelloEducation Parent — My Children</title>
+  <link rel="stylesheet" href="styling.css" />
+  <link rel="manifest" href="manifest.json" />
+  <link rel="icon" href="favicon.ico" />
+  <link rel="apple-touch-icon" href="icons/apple-touch-icon.png" />
+  <meta name="theme-color" content="#085041" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="HelloEducation" />
+</head>
+<body>
+  <header>
+    <h1>HelloEducation</h1>
+    <h1 class="page-heading">Parent — My Children</h1>
+  </header>
+
+  <navigation>
+    <ul>
+      <li><a href="index.html">Home</a></li>
+      <li><a href="services.html">Services</a></li>
+      <li><a href="tutors.html">Tutors</a></li>
+      <li><a href="contact.html">Contact</a></li>
+    </ul>
+  </navigation>
+
+  <main class="auth-page">
+    <section class="auth-panel dashboard-panel">
+      <div class="admin-subnav">
+        <a href="parent-dashboard.html">Overview</a>
+        <a href="parent-children.html" class="active">My Children</a>
+        <a href="parent-billing.html">Billing</a>
+      </div>
+
+      <h2 id="welcomeMessage">My Children</h2>
+      <p id="summaryText">Loading your children's dashboards…</p>
+
+      <div id="childrenContainer"></div>
+
+      <button id="signOutBtn" type="button">Sign Out</button>
+    </section>
+  </main>
+
+  <footer>
+    <p>&copy; 2023 HelloEducation. All rights reserved.</p>
+  </footer>
+
+  <script type="module">
+    import { initializeApp } from 'https://www.gstatic.com/firebasejs/12.4.0/firebase-app.js';
+    import { getAuth, onAuthStateChanged, signOut } from 'https://www.gstatic.com/firebasejs/12.4.0/firebase-auth.js';
+    import { getFirestore, doc, getDoc, collection, query, where, orderBy, getDocs } from 'https://www.gstatic.com/firebasejs/12.4.0/firebase-firestore.js';
+    import { firebaseConfig, isFirebaseConfigured } from './firebase-config.js';
+
+    const role = localStorage.getItem('helloEducationRole');
+    if (role !== 'parent') {
+      window.location.href = 'login.html?role=parent';
+    }
+
+    const app = initializeApp(firebaseConfig);
+    const auth = getAuth(app);
+    const db = getFirestore(app);
+    const welcomeMessage = document.getElementById('welcomeMessage');
+    const summaryText = document.getElementById('summaryText');
+    const childrenContainer = document.getElementById('childrenContainer');
+    const signOutBtn = document.getElementById('signOutBtn');
+
+    async function renderChild(studentId) {
+      const studentDoc = await getDoc(doc(db, 'students', studentId));
+      if (!studentDoc.exists()) return '';
+      const student = studentDoc.data();
+
+      const sessionsQuery = query(
+        collection(db, 'sessions'),
+        where('studentId', '==', studentId),
+        orderBy('scheduledAt', 'desc')
+      );
+      const snapshot = await getDocs(sessionsQuery);
+      const sessions = snapshot.docs.map((docSnap) => docSnap.data());
+
+      const upcoming = sessions.filter((s) => s.status === 'scheduled').reverse();
+      const past = sessions.filter((s) => s.status === 'completed');
+      const pending = sessions.filter((s) => s.status === 'pending').reverse();
+
+      return `
+        <div class="dashboard-card">
+          <h3>${student.name}</h3>
+          <p class="card-hint">Grade: ${student.grade || 'Not set'} — Email: ${student.email}</p>
+          <div class="dashboard-grid">
+            <div class="dashboard-card">
+              <h3>Upcoming schedule</h3>
+              <ul>${upcoming.length ? upcoming.map((s) => `<li>${s.subject} — ${s.scheduledAt.toDate().toLocaleString()} <span class="status-badge">${s.format === 'faceToFace' ? 'Face-to-face' : 'Online'}</span>${s.meetingLink ? ` — <a href="${s.meetingLink}" target="_blank" rel="noopener">Join session</a>` : ''}</li>`).join('') : '<li>No upcoming sessions scheduled.</li>'}</ul>
+            </div>
+            <div class="dashboard-card">
+              <h3>Pending requests</h3>
+              <ul>${pending.length ? pending.map((s) => `<li>${s.subject} — ${s.scheduledAt.toDate().toLocaleString()} <span class="status-badge">${s.format === 'faceToFace' ? 'Face-to-face' : 'Online'}</span> <span class="status-badge">pending</span></li>`).join('') : '<li>No pending requests.</li>'}</ul>
+            </div>
+            <div class="dashboard-card">
+              <h3>Progress &amp; feedback</h3>
+              <ul>${past.length ? past.map((s) => `<li><span>${s.subject} — ${s.scheduledAt.toDate().toLocaleDateString()} <span class="status-badge">${s.format === 'faceToFace' ? 'Face-to-face' : 'Online'}</span>${s.notes ? `<br>${s.notes}` : ''}</span></li>`).join('') : '<li>No session feedback yet.</li>'}</ul>
+            </div>
+          </div>
+        </div>
+      `;
+    }
+
+    async function renderChildren() {
+      const parentDoc = await getDoc(doc(db, 'users', auth.currentUser.uid));
+      const childUids = (parentDoc.exists() && parentDoc.data().childUids) || [];
+
+      if (!childUids.length) {
+        childrenContainer.innerHTML = '<div class="dashboard-card"><p>No children linked to your account yet. Contact the HelloEducation admin to get this set up.</p></div>';
+        summaryText.textContent = 'No linked children yet.';
+        return;
+      }
+
+      const childCards = await Promise.all(childUids.map(renderChild));
+      childrenContainer.innerHTML = childCards.join('');
+      summaryText.textContent = `Showing ${childUids.length} linked ${childUids.length === 1 ? 'child' : 'children'}.`;
+    }
+
+    onAuthStateChanged(auth, async (user) => {
+      if (!user && !isFirebaseConfigured()) {
+        welcomeMessage.textContent = 'My Children';
+        summaryText.textContent = 'Demo mode is active. Connect Firebase to see real data.';
+        return;
+      }
+
+      if (!user) {
+        window.location.href = 'login.html?role=parent';
+        return;
+      }
+
+      renderChildren();
+    });
+
+    signOutBtn.addEventListener('click', async () => {
+      if (!isFirebaseConfigured()) {
+        localStorage.removeItem('helloEducationRole');
+        localStorage.removeItem('helloEducationUser');
+        window.location.href = 'login.html?role=parent';
+        return;
+      }
+
+      await signOut(auth);
+    });
+  </script>
+  <script>
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('sw.js').catch(() => {});
+      });
+    }
+  </script>
+</body>
+</html>

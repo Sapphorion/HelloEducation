@@ -30,86 +30,29 @@
 
   <main class="auth-page">
     <section class="auth-panel dashboard-panel">
+      <div class="admin-subnav">
+        <a href="student-dashboard.html" class="active">Overview</a>
+        <a href="student-schedule.html">Schedule</a>
+        <a href="student-assignments.html">Assignments</a>
+        <a href="student-help.html">Help</a>
+      </div>
+
       <h2 id="welcomeMessage">Welcome back</h2>
-      <p id="summaryText">Loading your dashboard…</p>
-
-      <div class="dashboard-grid">
-        <div class="dashboard-card">
-          <h3>Today’s focus</h3>
-          <ul id="taskList"><li>Loading…</li></ul>
-        </div>
-        <div class="dashboard-card">
-          <h3>Upcoming sessions</h3>
-          <ul id="upcomingSessions"></ul>
-        </div>
-        <div class="dashboard-card">
-          <h3>Study resources</h3>
-          <ul id="resourceList"><li>Loading…</li></ul>
-        </div>
-        <div class="dashboard-card">
-          <h3>Available tutors</h3>
-          <ul id="tutorList"></ul>
-        </div>
-      </div>
-
-      <div class="dashboard-grid">
-        <div class="dashboard-card">
-          <h3>Request a session</h3>
-          <form id="requestSessionForm" class="admin-form">
-            <select id="requestTutor" required>
-              <option value="">Choose a tutor…</option>
-            </select>
-            <ul id="tutorAvailabilityHint"></ul>
-            <input id="requestSubject" type="text" placeholder="Subject" required />
-            <input id="requestDateTime" type="datetime-local" required />
-            <select id="requestFormat" required>
-              <option value="online">Online</option>
-              <option value="faceToFace">Face-to-face</option>
-            </select>
-            <textarea id="requestNotes" placeholder="Anything the tutor should know (optional)" rows="2"></textarea>
-            <button type="submit">Request session</button>
-          </form>
-          <p class="auth-feedback" id="requestFeedback"></p>
-        </div>
-        <div class="dashboard-card">
-          <h3>My requests</h3>
-          <ul id="myRequestsList"><li>Loading…</li></ul>
-        </div>
-      </div>
-
-      <div class="dashboard-card">
-        <h3>Progress &amp; feedback</h3>
-        <ul id="progressList"><li>Loading…</li></ul>
-      </div>
-
-      <div class="dashboard-card">
-        <h3>AI Homework Helper</h3>
-        <p class="card-hint">An AI assistant you can use between sessions for homework help. It's not your tutor — for anything important, use "Ask a tutor" below instead.</p>
-        <ul id="aiChatLog" class="ai-chat-log"><li>Loading…</li></ul>
-        <form id="aiChatForm" class="admin-form">
-          <textarea id="aiChatInput" placeholder="Ask a question…" rows="2" required></textarea>
-          <button type="submit">Send</button>
-        </form>
-        <p class="auth-feedback" id="aiChatFeedback"></p>
-      </div>
+      <p id="summaryText">Choose a section below to get started.</p>
 
       <div class="dashboard-grid dashboard-grid-2">
-        <div class="dashboard-card">
-          <h3>Ask a tutor</h3>
-          <form id="askForm" class="admin-form">
-            <select id="askTutor" required>
-              <option value="">Choose a tutor…</option>
-            </select>
-            <input id="askSubject" type="text" placeholder="Subject" required />
-            <textarea id="askMessage" placeholder="Your question" rows="3" required></textarea>
-            <button type="submit">Send question</button>
-          </form>
-          <p class="auth-feedback" id="askFeedback"></p>
-        </div>
-        <div class="dashboard-card">
-          <h3>My questions</h3>
-          <ul id="questionsList"><li>Loading…</li></ul>
-        </div>
+        <a class="dashboard-card admin-nav-card" href="student-schedule.html">
+          <h3>Schedule</h3>
+          <p class="card-hint">Upcoming sessions, request a new one, and your progress &amp; feedback.</p>
+        </a>
+        <a class="dashboard-card admin-nav-card" href="student-assignments.html">
+          <h3>Assignments</h3>
+          <p class="card-hint">Today's focus and study resources your tutors have shared.</p>
+        </a>
+        <a class="dashboard-card admin-nav-card" href="student-help.html">
+          <h3>Help</h3>
+          <p class="card-hint">Ask the AI Homework Helper or send a question to a tutor.</p>
+        </a>
       </div>
 
       <div class="dashboard-card">
@@ -134,16 +77,8 @@
   <script type="module">
     import { initializeApp } from 'https://www.gstatic.com/firebasejs/12.4.0/firebase-app.js';
     import { getAuth, onAuthStateChanged, signOut, EmailAuthProvider, reauthenticateWithCredential, updatePassword } from 'https://www.gstatic.com/firebasejs/12.4.0/firebase-auth.js';
-    import { getFirestore, collection, query, where, orderBy, getDocs, getDoc, updateDoc, doc, addDoc, serverTimestamp } from 'https://www.gstatic.com/firebasejs/12.4.0/firebase-firestore.js';
-    import { getFunctions, httpsCallable } from 'https://www.gstatic.com/firebasejs/12.4.0/firebase-functions.js';
-    import { getStorage, ref, uploadBytes, getDownloadURL } from 'https://www.gstatic.com/firebasejs/12.4.0/firebase-storage.js';
+    import { getFirestore, doc, getDoc } from 'https://www.gstatic.com/firebasejs/12.4.0/firebase-firestore.js';
     import { firebaseConfig, isFirebaseConfigured } from './firebase-config.js';
-
-    const DAY_NAMES = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
-
-    function formatLabel(session) {
-      return session.format === 'faceToFace' ? 'Face-to-face' : 'Online';
-    }
 
     const role = localStorage.getItem('helloEducationRole');
     if (role !== 'student') {
@@ -153,301 +88,11 @@
     const app = initializeApp(firebaseConfig);
     const auth = getAuth(app);
     const db = getFirestore(app);
-    const functions = getFunctions(app);
-    const storage = getStorage(app);
-    const requestSessionCallable = httpsCallable(functions, 'requestSession');
-    const askAICallable = httpsCallable(functions, 'askAI');
     const welcomeMessage = document.getElementById('welcomeMessage');
     const summaryText = document.getElementById('summaryText');
-    const taskList = document.getElementById('taskList');
-    const upcomingSessions = document.getElementById('upcomingSessions');
-    const resourceList = document.getElementById('resourceList');
-    const tutorList = document.getElementById('tutorList');
-    const progressList = document.getElementById('progressList');
-    const requestSessionForm = document.getElementById('requestSessionForm');
-    const requestTutor = document.getElementById('requestTutor');
-    const tutorAvailabilityHint = document.getElementById('tutorAvailabilityHint');
-    const requestSubject = document.getElementById('requestSubject');
-    const requestFeedback = document.getElementById('requestFeedback');
-    const myRequestsList = document.getElementById('myRequestsList');
-    const askForm = document.getElementById('askForm');
-    const askTutor = document.getElementById('askTutor');
-    const askFeedback = document.getElementById('askFeedback');
-    const questionsList = document.getElementById('questionsList');
-    const aiChatLog = document.getElementById('aiChatLog');
-    const aiChatForm = document.getElementById('aiChatForm');
-    const aiChatInput = document.getElementById('aiChatInput');
-    const aiChatFeedback = document.getElementById('aiChatFeedback');
     const signOutBtn = document.getElementById('signOutBtn');
     const changePasswordForm = document.getElementById('changePasswordForm');
     const changePasswordFeedback = document.getElementById('changePasswordFeedback');
-
-    function appendChatBubble(role, content) {
-      const li = document.createElement('li');
-      li.className = role === 'user' ? 'ai-chat-bubble ai-chat-user' : 'ai-chat-bubble ai-chat-assistant';
-      li.textContent = content;
-      aiChatLog.appendChild(li);
-      aiChatLog.scrollTop = aiChatLog.scrollHeight;
-    }
-
-    async function renderAIChat() {
-      if (!auth.currentUser) return;
-      const messagesQuery = query(
-        collection(db, 'aiConversations', auth.currentUser.uid, 'messages'),
-        orderBy('createdAt', 'asc')
-      );
-      const snapshot = await getDocs(messagesQuery);
-
-      if (snapshot.empty) {
-        aiChatLog.innerHTML = '<li>Ask a question to get started.</li>';
-        return;
-      }
-
-      aiChatLog.innerHTML = '';
-      snapshot.docs.forEach((docSnap) => {
-        const m = docSnap.data();
-        appendChatBubble(m.role, m.content);
-      });
-    }
-
-    aiChatForm.addEventListener('submit', async (event) => {
-      event.preventDefault();
-      const message = aiChatInput.value.trim();
-      if (!message) return;
-
-      if (!aiChatLog.querySelector('.ai-chat-bubble')) {
-        aiChatLog.innerHTML = '';
-      }
-      appendChatBubble('user', message);
-      aiChatInput.value = '';
-      aiChatFeedback.textContent = 'Thinking…';
-      const submitBtn = aiChatForm.querySelector('button[type="submit"]');
-      submitBtn.disabled = true;
-
-      try {
-        const response = await askAICallable({ message });
-        appendChatBubble('assistant', response.data.reply);
-        aiChatFeedback.textContent = '';
-      } catch (error) {
-        aiChatFeedback.textContent = error.message || 'Could not reach the AI assistant.';
-      } finally {
-        submitBtn.disabled = false;
-      }
-    });
-
-    async function renderSessions() {
-      if (!auth.currentUser) return;
-      const sessionsQuery = query(
-        collection(db, 'sessions'),
-        where('studentId', '==', auth.currentUser.uid),
-        orderBy('scheduledAt', 'desc')
-      );
-      const snapshot = await getDocs(sessionsQuery);
-      const sessions = snapshot.docs.map((docSnap) => ({ id: docSnap.id, ...docSnap.data() }));
-
-      const upcoming = sessions.filter((s) => s.status === 'scheduled').reverse();
-      upcomingSessions.innerHTML = upcoming.length
-        ? upcoming.map((s) => `<li>${s.subject} — ${s.scheduledAt.toDate().toLocaleString()} <span class="status-badge">${formatLabel(s)}</span>${s.meetingLink ? ` — <a href="${s.meetingLink}" target="_blank" rel="noopener">Join session</a>` : ''}</li>`).join('')
-        : '<li>No upcoming sessions scheduled.</li>';
-
-      const past = sessions.filter((s) => s.status === 'completed');
-      progressList.innerHTML = past.length
-        ? past.map((s) => `<li><span>${s.subject} — ${s.scheduledAt.toDate().toLocaleDateString()} <span class="status-badge">${formatLabel(s)}</span>${s.notes ? `<br>${s.notes}` : ''}</span></li>`).join('')
-        : '<li>No session feedback yet.</li>';
-
-      const pending = sessions.filter((s) => s.status === 'pending');
-      myRequestsList.innerHTML = pending.length
-        ? pending.map((s) => `
-          <li>
-            <span>${s.subject} — ${s.scheduledAt.toDate().toLocaleString()} <span class="status-badge">${formatLabel(s)}</span> <span class="status-badge">pending</span></span>
-            <button class="action-btn secondary" data-session-id="${s.id}" type="button">Cancel</button>
-          </li>
-        `).join('')
-        : '<li>No pending requests.</li>';
-    }
-
-    myRequestsList.addEventListener('click', async (event) => {
-      const button = event.target.closest('button[data-session-id]');
-      if (!button) return;
-      await updateDoc(doc(db, 'sessions', button.dataset.sessionId), { status: 'cancelled' });
-      await renderSessions();
-    });
-
-    async function populateTutorSelect() {
-      const snapshot = await getDocs(collection(db, 'tutors'));
-      const tutors = snapshot.docs.map((docSnap) => ({ id: docSnap.id, ...docSnap.data() }));
-
-      const tutorOptions = tutors.map((tutor) =>
-        `<option value="${tutor.id}" data-subject="${tutor.subject}">${tutor.name} — ${tutor.subject}</option>`
-      ).join('');
-      requestTutor.innerHTML = '<option value="">Choose a tutor…</option>' + tutorOptions;
-      askTutor.innerHTML = '<option value="">Choose a tutor…</option>' + tutorOptions;
-
-      tutorList.innerHTML = tutors.length
-        ? tutors.map((tutor) => `<li>${tutor.name} — ${tutor.subject}</li>`).join('')
-        : '<li>No tutors listed yet.</li>';
-    }
-
-    requestTutor.addEventListener('change', async () => {
-      const tutorId = requestTutor.value;
-      tutorAvailabilityHint.innerHTML = '';
-      if (!tutorId) return;
-
-      const selectedOption = requestTutor.options[requestTutor.selectedIndex];
-      requestSubject.value = selectedOption.dataset.subject || '';
-
-      const availabilityQuery = query(collection(db, 'availability'), where('tutorId', '==', tutorId));
-      const snapshot = await getDocs(availabilityQuery);
-      const slots = snapshot.docs
-        .map((docSnap) => docSnap.data())
-        .sort((a, b) => a.dayOfWeek - b.dayOfWeek);
-
-      tutorAvailabilityHint.innerHTML = slots.length
-        ? slots.map((slot) => `<li>${DAY_NAMES[slot.dayOfWeek]}: ${slot.startTime}–${slot.endTime}</li>`).join('')
-        : '<li>This tutor hasn\'t set their availability yet — request a time and they can confirm.</li>';
-    });
-
-    requestSessionForm.addEventListener('submit', async (event) => {
-      event.preventDefault();
-      requestFeedback.textContent = 'Sending request…';
-
-      const tutorId = requestTutor.value;
-      const subject = requestSubject.value.trim();
-      const dateTimeValue = document.getElementById('requestDateTime').value;
-      const format = document.getElementById('requestFormat').value;
-      const notes = document.getElementById('requestNotes').value.trim();
-
-      try {
-        await requestSessionCallable({ tutorId, subject, scheduledAt: new Date(dateTimeValue).toISOString(), format, notes });
-        requestFeedback.textContent = 'Request sent! The tutor will confirm or decline it.';
-        requestSessionForm.reset();
-        tutorAvailabilityHint.innerHTML = '';
-        await renderSessions();
-      } catch (error) {
-        requestFeedback.textContent = error.message || 'Could not send the request.';
-      }
-    });
-
-    async function renderAssignments() {
-      if (!auth.currentUser) return;
-      const assignmentsQuery = query(collection(db, 'assignments'), where('studentId', '==', auth.currentUser.uid));
-      const snapshot = await getDocs(assignmentsQuery);
-      const assignments = snapshot.docs
-        .map((docSnap) => ({ id: docSnap.id, ...docSnap.data() }))
-        .sort((a, b) => (b.createdAt?.toMillis() || 0) - (a.createdAt?.toMillis() || 0));
-
-      taskList.innerHTML = assignments.length
-        ? assignments.map((a) => `
-          <li>
-            <div>
-              <strong>${a.title}</strong> <span class="status-badge">${a.status}</span>
-              ${a.description ? `<br>${a.description}` : ''}
-              ${a.attachmentUrl ? `<br>Attachment: <a href="${a.attachmentUrl}" target="_blank" rel="noopener">${a.attachmentName || 'View file'}</a>` : ''}
-              ${a.status !== 'assigned' ? `<br>Your submission: ${a.submissionNote || '(no note)'}${a.fileUrl ? ` — <a href="${a.fileUrl}" target="_blank" rel="noopener">${a.fileName}</a>` : ''}` : ''}
-              ${a.feedback ? `<br>Tutor feedback: ${a.feedback}` : ''}
-            </div>
-            ${a.status === 'assigned' ? `
-              <form class="admin-form" data-submit-assignment="${a.id}">
-                <input type="text" placeholder="Note (optional)" data-note-input />
-                <input type="file" data-file-input />
-                <button type="submit">Submit</button>
-              </form>
-            ` : ''}
-          </li>
-        `).join('')
-        : '<li>Nothing assigned yet.</li>';
-    }
-
-    taskList.addEventListener('submit', async (event) => {
-      const form = event.target.closest('form[data-submit-assignment]');
-      if (!form) return;
-      event.preventDefault();
-
-      const assignmentId = form.dataset.submitAssignment;
-      const note = form.querySelector('[data-note-input]').value.trim();
-      const file = form.querySelector('[data-file-input]').files[0];
-      const submitBtn = form.querySelector('button[type="submit"]');
-      submitBtn.disabled = true;
-      submitBtn.textContent = 'Submitting…';
-
-      try {
-        let fileUrl = null;
-        let fileName = null;
-
-        if (file) {
-          const fileRef = ref(storage, `assignment-submissions/${auth.currentUser.uid}/${assignmentId}/${file.name}`);
-          await uploadBytes(fileRef, file);
-          fileUrl = await getDownloadURL(fileRef);
-          fileName = file.name;
-        }
-
-        await updateDoc(doc(db, 'assignments', assignmentId), {
-          submissionNote: note,
-          fileUrl,
-          fileName,
-          status: 'submitted',
-          submittedAt: serverTimestamp()
-        });
-
-        await renderAssignments();
-      } catch (error) {
-        alert(error.message || 'Could not submit this assignment.');
-        submitBtn.disabled = false;
-        submitBtn.textContent = 'Submit';
-      }
-    });
-
-    async function renderQuestions() {
-      if (!auth.currentUser) return;
-      const questionsQuery = query(collection(db, 'questions'), where('studentId', '==', auth.currentUser.uid));
-      const snapshot = await getDocs(questionsQuery);
-      const questions = snapshot.docs
-        .map((docSnap) => docSnap.data())
-        .sort((a, b) => (b.createdAt?.toMillis() || 0) - (a.createdAt?.toMillis() || 0));
-
-      questionsList.innerHTML = questions.length
-        ? questions.map((q) => `
-          <li>
-            <span><strong>${q.subject}</strong> — ${q.message} <span class="status-badge">${q.status}</span>${q.reply ? `<br>Tutor reply: ${q.reply}` : ''}</span>
-          </li>
-        `).join('')
-        : '<li>No questions asked yet.</li>';
-    }
-
-    askForm.addEventListener('submit', async (event) => {
-      event.preventDefault();
-      askFeedback.textContent = 'Sending…';
-
-      const tutorId = askTutor.value;
-      const subject = document.getElementById('askSubject').value.trim();
-      const message = document.getElementById('askMessage').value.trim();
-
-      await addDoc(collection(db, 'questions'), {
-        studentId: auth.currentUser.uid,
-        studentEmail: auth.currentUser.email || '',
-        tutorId,
-        subject,
-        message,
-        reply: '',
-        status: 'open',
-        createdAt: serverTimestamp()
-      });
-
-      askFeedback.textContent = 'Question sent.';
-      askForm.reset();
-      await renderQuestions();
-    });
-
-    async function renderResources() {
-      if (!auth.currentUser) return;
-      const resourcesQuery = query(collection(db, 'studyResources'), where('studentId', '==', auth.currentUser.uid));
-      const snapshot = await getDocs(resourcesQuery);
-      const resources = snapshot.docs.map((docSnap) => docSnap.data());
-
-      resourceList.innerHTML = resources.length
-        ? resources.map((r) => `<li>${r.url ? `<a href="${r.url}" target="_blank" rel="noopener">${r.title}</a>` : r.title} (${r.type})</li>`).join('')
-        : '<li>No resources shared yet.</li>';
-    }
 
     onAuthStateChanged(auth, async (user) => {
       if (!user && !isFirebaseConfigured()) {
@@ -462,13 +107,6 @@
 
       const userDocSnap = await getDoc(doc(db, 'users', user.uid));
       welcomeMessage.textContent = `Welcome back, ${(userDocSnap.exists() && userDocSnap.data().name) || user.email || 'student'}!`;
-      summaryText.textContent = 'Here\'s what\'s happening with your tutoring.';
-      renderAssignments();
-      renderResources();
-      renderSessions();
-      renderQuestions();
-      renderAIChat();
-      populateTutorSelect();
     });
 
     changePasswordForm.addEventListener('submit', async (event) => {

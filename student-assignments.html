@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>HelloEducation Student — Assignments</title>
+  <link rel="stylesheet" href="styling.css" />
+  <link rel="manifest" href="manifest.json" />
+  <link rel="icon" href="favicon.ico" />
+  <link rel="apple-touch-icon" href="icons/apple-touch-icon.png" />
+  <meta name="theme-color" content="#085041" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="HelloEducation" />
+</head>
+<body>
+  <header>
+    <h1>HelloEducation</h1>
+    <h1 class="page-heading">Student — Assignments</h1>
+  </header>
+
+  <navigation>
+    <ul>
+      <li><a href="index.html">Home</a></li>
+      <li><a href="services.html">Services</a></li>
+      <li><a href="tutors.html">Tutors</a></li>
+      <li><a href="contact.html">Contact</a></li>
+    </ul>
+  </navigation>
+
+  <main class="auth-page">
+    <section class="auth-panel dashboard-panel">
+      <div class="admin-subnav">
+        <a href="student-dashboard.html">Overview</a>
+        <a href="student-schedule.html">Schedule</a>
+        <a href="student-assignments.html" class="active">Assignments</a>
+        <a href="student-help.html">Help</a>
+      </div>
+
+      <h2 id="welcomeMessage">Assignments</h2>
+      <p id="summaryText">Today's focus and study resources your tutors have shared.</p>
+
+      <div class="dashboard-card">
+        <h3>Today's focus</h3>
+        <ul id="taskList"><li>Loading…</li></ul>
+      </div>
+
+      <div class="dashboard-card">
+        <h3>Study resources</h3>
+        <ul id="resourceList"><li>Loading…</li></ul>
+      </div>
+
+      <button id="signOutBtn" type="button">Sign Out</button>
+    </section>
+  </main>
+
+  <footer>
+    <p>&copy; 2023 HelloEducation. All rights reserved.</p>
+  </footer>
+
+  <script type="module">
+    import { initializeApp } from 'https://www.gstatic.com/firebasejs/12.4.0/firebase-app.js';
+    import { getAuth, onAuthStateChanged, signOut } from 'https://www.gstatic.com/firebasejs/12.4.0/firebase-auth.js';
+    import { getFirestore, collection, query, where, getDocs, updateDoc, doc, serverTimestamp } from 'https://www.gstatic.com/firebasejs/12.4.0/firebase-firestore.js';
+    import { getStorage, ref, uploadBytes, getDownloadURL } from 'https://www.gstatic.com/firebasejs/12.4.0/firebase-storage.js';
+    import { firebaseConfig, isFirebaseConfigured } from './firebase-config.js';
+
+    const role = localStorage.getItem('helloEducationRole');
+    if (role !== 'student') {
+      window.location.href = 'login.html?role=student';
+    }
+
+    const app = initializeApp(firebaseConfig);
+    const auth = getAuth(app);
+    const db = getFirestore(app);
+    const storage = getStorage(app);
+    const welcomeMessage = document.getElementById('welcomeMessage');
+    const summaryText = document.getElementById('summaryText');
+    const taskList = document.getElementById('taskList');
+    const resourceList = document.getElementById('resourceList');
+    const signOutBtn = document.getElementById('signOutBtn');
+
+    async function renderAssignments() {
+      if (!auth.currentUser) return;
+      const assignmentsQuery = query(collection(db, 'assignments'), where('studentId', '==', auth.currentUser.uid));
+      const snapshot = await getDocs(assignmentsQuery);
+      const assignments = snapshot.docs
+        .map((docSnap) => ({ id: docSnap.id, ...docSnap.data() }))
+        .sort((a, b) => (b.createdAt?.toMillis() || 0) - (a.createdAt?.toMillis() || 0));
+
+      taskList.innerHTML = assignments.length
+        ? assignments.map((a) => `
+          <li>
+            <div>
+              <strong>${a.title}</strong> <span class="status-badge">${a.status}</span>
+              ${a.description ? `<br>${a.description}` : ''}
+              ${a.attachmentUrl ? `<br>Attachment: <a href="${a.attachmentUrl}" target="_blank" rel="noopener">${a.attachmentName || 'View file'}</a>` : ''}
+              ${a.status !== 'assigned' ? `<br>Your submission: ${a.submissionNote || '(no note)'}${a.fileUrl ? ` — <a href="${a.fileUrl}" target="_blank" rel="noopener">${a.fileName}</a>` : ''}` : ''}
+              ${a.feedback ? `<br>Tutor feedback: ${a.feedback}` : ''}
+            </div>
+            ${a.status === 'assigned' ? `
+              <form class="admin-form" data-submit-assignment="${a.id}">
+                <input type="text" placeholder="Note (optional)" data-note-input />
+                <input type="file" data-file-input />
+                <button type="submit">Submit</button>
+              </form>
+            ` : ''}
+          </li>
+        `).join('')
+        : '<li>Nothing assigned yet.</li>';
+    }
+
+    taskList.addEventListener('submit', async (event) => {
+      const form = event.target.closest('form[data-submit-assignment]');
+      if (!form) return;
+      event.preventDefault();
+
+      const assignmentId = form.dataset.submitAssignment;
+      const note = form.querySelector('[data-note-input]').value.trim();
+      const file = form.querySelector('[data-file-input]').files[0];
+      const submitBtn = form.querySelector('button[type="submit"]');
+      submitBtn.disabled = true;
+      submitBtn.textContent = 'Submitting…';
+
+      try {
+        let fileUrl = null;
+        let fileName = null;
+
+        if (file) {
+          const fileRef = ref(storage, `assignment-submissions/${auth.currentUser.uid}/${assignmentId}/${file.name}`);
+          await uploadBytes(fileRef, file);
+          fileUrl = await getDownloadURL(fileRef);
+          fileName = file.name;
+        }
+
+        await updateDoc(doc(db, 'assignments', assignmentId), {
+          submissionNote: note,
+          fileUrl,
+          fileName,
+          status: 'submitted',
+          submittedAt: serverTimestamp()
+        });
+
+        await renderAssignments();
+      } catch (error) {
+        alert(error.message || 'Could not submit this assignment.');
+        submitBtn.disabled = false;
+        submitBtn.textContent = 'Submit';
+      }
+    });
+
+    async function renderResources() {
+      if (!auth.currentUser) return;
+      const resourcesQuery = query(collection(db, 'studyResources'), where('studentId', '==', auth.currentUser.uid));
+      const snapshot = await getDocs(resourcesQuery);
+      const resources = snapshot.docs.map((docSnap) => docSnap.data());
+
+      resourceList.innerHTML = resources.length
+        ? resources.map((r) => `<li>${r.url ? `<a href="${r.url}" target="_blank" rel="noopener">${r.title}</a>` : r.title} (${r.type})</li>`).join('')
+        : '<li>No resources shared yet.</li>';
+    }
+
+    onAuthStateChanged(auth, async (user) => {
+      if (!user && !isFirebaseConfigured()) {
+        welcomeMessage.textContent = 'Assignments';
+        summaryText.textContent = 'Demo mode is active. Connect Firebase to see real data.';
+        return;
+      }
+
+      if (!user) {
+        window.location.href = 'login.html?role=student';
+        return;
+      }
+
+      renderAssignments();
+      renderResources();
+    });
+
+    signOutBtn.addEventListener('click', async () => {
+      if (!isFirebaseConfigured()) {
+        localStorage.removeItem('helloEducationRole');
+        localStorage.removeItem('helloEducationUser');
+        window.location.href = 'login.html?role=student';
+        return;
+      }
+
+      await signOut(auth);
+    });
+  </script>
+  <script>
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('sw.js').catch(() => {});
+      });
+    }
+  </script>
+</body>
+</html>
