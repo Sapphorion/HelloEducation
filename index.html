@@ -3,6 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="HelloEducation offers one-on-one matric tutoring and a Second Chance Programme for adults finishing their matric certificate, plus homeschool and adult education support across South Africa." />
     <link rel="stylesheet" href="styling.css">
     <link rel="manifest" href="manifest.json" />
     <link rel="icon" href="favicon.ico" />
@@ -11,123 +12,163 @@
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <meta name="apple-mobile-web-app-title" content="HelloEducation" />
-    <title>HelloEducation</title>
+    <title>HelloEducation | Matric &amp; Adult Matric Tutoring in South Africa</title>
     <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
-        body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background: #085041;
-            min-height: 100vh;
-            padding: 20px 20px 40px;
-            line-height: 1.6;
-            color: #333;
-            font-size: 18px;
-            font-weight: 500;
-        }
-        header {
-            color: white;
-            padding: 0.5rem 1rem;
+        .hero {
+            background: white;
+            border-radius: 12px;
+            padding: 2.5rem 2rem;
+            box-shadow: 0 8px 16px rgba(0, 0, 0, 0.2);
             text-align: center;
         }
-        header h1.page-heading {
-            font-size: 1.25rem;
-            margin-bottom: 10px;
+        .hero h2 {
+            font-size: 1.8rem;
+            color: #04342C;
+            margin-bottom: 0.75rem;
+        }
+        .hero p {
+            max-width: 640px;
+            margin: 0 auto;
+            color: #333;
+        }
+        .hero-actions {
+            display: flex;
+            justify-content: center;
+            gap: 1rem;
+            flex-wrap: wrap;
+            margin-top: 1.5rem;
+        }
+        .hero-btn {
+            display: inline-flex;
+            align-items: center;
+            padding: 0.7rem 1.4rem;
+            border-radius: 999px;
+            background: #085041;
+            color: white;
+            text-decoration: none;
+            font-weight: 600;
+            transition: background-color 0.2s ease, transform 0.2s ease;
+        }
+        .hero-btn:hover {
+            background: #0F6E56;
+            transform: translateY(-2px);
+        }
+        .hero-btn.secondary {
+            background: #E1F5EE;
+            color: #04342C;
+        }
+        .hero-btn.secondary:hover {
+            background: #cdeee0;
+        }
+        .section-heading {
+            color: white;
+            text-align: center;
+            font-size: 1.5rem;
+            margin: 3rem 0 1.25rem;
+        }
+        .section-lead {
+            color: #E1F5EE;
+            text-align: center;
+            max-width: 640px;
+            margin: 0 auto 1.5rem;
+        }
+        .audience-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+            gap: 1.5rem;
+        }
+        .audience-card {
+            background: white;
+            border-radius: 12px;
+            padding: 1.75rem;
+            box-shadow: 0 8px 16px rgba(0, 0, 0, 0.2);
+            transition: transform 0.3s, box-shadow 0.3s;
+        }
+        .audience-card:hover {
+            transform: translateY(-6px);
+            box-shadow: 0 12px 24px rgba(0, 0, 0, 0.3);
+        }
+        .audience-card .eyebrow {
+            display: inline-block;
+            background: #E1F5EE;
+            color: #04342C;
+            font-size: 0.75rem;
+            font-weight: 700;
+            letter-spacing: 0.03em;
+            text-transform: uppercase;
+            padding: 0.2rem 0.6rem;
+            border-radius: 999px;
+            margin-bottom: 0.6rem;
+        }
+        .audience-card h3 {
+            color: #04342C;
+            margin-bottom: 0.5rem;
+        }
+        .audience-card p {
+            color: #333;
+            margin-bottom: 1rem;
+        }
+        .audience-card a {
+            color: #0F6E56;
+            font-weight: 600;
+            text-decoration: none;
+        }
+        .audience-card a:hover {
+            text-decoration: underline;
+        }
+        .why-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 1.25rem;
+        }
+        .why-card {
+            background: rgba(255, 255, 255, 0.08);
+            border: 1px solid rgba(255, 255, 255, 0.25);
+            border-radius: 12px;
+            padding: 1.25rem;
+            color: white;
+        }
+        .why-card h3 {
+            font-size: 1.05rem;
+            margin-bottom: 0.4rem;
+        }
+        .why-card p {
+            color: #E1F5EE;
+            font-size: 0.95rem;
+        }
+        .home-cta {
+            background: white;
+            border-radius: 12px;
+            padding: 2rem;
+            margin-top: 3rem;
+            text-align: center;
+            box-shadow: 0 8px 16px rgba(0, 0, 0, 0.2);
+        }
+        .home-cta h2 {
+            color: #04342C;
+            margin-bottom: 0.5rem;
+        }
+        .home-cta p {
+            color: #333;
+            margin-bottom: 1.25rem;
         }
 
         @media (max-width: 768px) {
-            body {
-                padding: 16px 15px 30px;
-                font-size: 16px;
+            .hero {
+                padding: 1.75rem 1.25rem;
             }
-
-            header h1.page-heading {
-                font-size: 1rem;
-                margin-bottom: 8px;
+            .hero h2 {
+                font-size: 1.4rem;
             }
-
-            #about {
-                padding: 1.5rem;
+            .section-heading {
+                font-size: 1.25rem;
+                margin: 2rem 0 1rem;
             }
         }
 
         @media (max-width: 480px) {
-            body {
-                padding: 12px 10px 20px;
-                font-size: 14px;
-            }
-
-            header h1.page-heading {
-                font-size: 0.9rem;
-                margin-bottom: 6px;
-            }
-
-            #about {
-                padding: 1rem;
-            }
-
-            #about h2 {
-                font-size: 1.3rem;
-            }
-        }
-        main {
-            max-width: 1200px;
-            margin: 2rem auto;
-            padding: 0 1rem;
-        }
-        #about {
-            background: white;
-            border-radius: 12px;
-            padding: 2rem;
-            box-shadow: 0 8px 16px rgba(0, 0, 0, 0.2);
-            color: #333;
-        }
-        #about h2 {
-            color: #333;
-            margin-bottom: 1rem;
-        }
-        button {
-            background-color: #085041;
-            color: white;
-            padding: 10px 20px;
-            border: none;
-            border-radius: 5px;
-            cursor: pointer;
-            font-size: 16px;
-            font-weight: 600;
-            transition: background-color 0.3s ease;
-        }
-        button:hover {
-            background-color: #0F6E56;
-        }
-        footer {
-            background-color: #333;
-            color: white;
-            text-align: center;
-            padding: 1rem;
-            margin-top: 2rem;
-        }
-        
-        @media (max-width: 768px) {
-            body {
-                padding: 16px 15px 30px;
-                font-size: 16px;
-            }
-
-            header h1.page-heading {
-                margin-bottom: 8px;
-            }
-
-            main {
-                margin: 1rem auto;
-                padding: 0 0.5rem;
-            }
-            
-            #about {
-                padding: 1.5rem;
+            .hero {
+                padding: 1.5rem 1rem;
             }
         }
     </style>
@@ -135,7 +176,7 @@
 <body>
     <header>
         <img src="images/HELLO..jpg" alt="HelloEducation" class="site-logo" />
-        <h1 class="page-heading">Home</h1>
+        <h1 class="page-heading">Matric &amp; Adult Matric Tutoring</h1>
     </header>
     <navigation>
         <ul>
@@ -149,29 +190,87 @@
     </navigation>
 
     <main>
-        <section id="about">
-            <h2>About Hello Education</h2>
-            <p> Hello Education has been going since 2023. 
-                We have been providing quality education resources and services to students nationwide.
-                We believe in the power of education to transform lives and communities because we believe that the power of education can change the world.
-
-                While focusing on delivering top-notch educational content, we also prioritize creating an inclusive and supportive learning environment for all our students.
-                We have a strong STEM program that encourages innovation and critical thinking among learners, but we aren't only available for STEM subjects.
-                Our curriculum spans a wide range of subjects, ensuring that every student finds something that sparks their interest.
-
-                We also believe that learning should be a lifelong journey for all types of students.
-                Therefore, we offer resources not only for K-12 students but also for adult learners looking to enhance their skills or pursue new interests.
-
-                Our devotion to all types of students to education is unwavering, and we continuously strive to improve our offerings and reach more learners every day.
-                We have developed our techniques to identify and address the unique needs of each student, ensuring personalized learning experiences that foster growth and success.
-                We have had many students who are both on and off the spectrum succeed through our programs, and we are committed to continuing this trend. 
-                From ADHD to Autism Spectrum Disorder, we understand the challenges faced by neurodiverse learners and tailor our approaches to support their unique learning styles.
-                At Hello Education, we are more than just an educational platform; we are a community dedicated to empowering individuals through knowledge and skills.
-                Join us on this exciting journey of learning and discovery, and let's shape the future together!
+        <section class="hero">
+            <h2>Learning support that actually feels supportive</h2>
+            <p>
+                Whether you're a matric student working toward your best results, an adult going back to finish
+                the matric certificate you never got to complete, or a parent trying to find the right tutor for
+                your child — we're here to make it feel achievable, not overwhelming.
             </p>
+            <div class="hero-actions">
+                <a class="hero-btn" href="tutors.html">Find a Tutor</a>
+                <a class="hero-btn secondary" href="services.html">See Our Programmes</a>
+            </div>
+        </section>
+
+        <h2 class="section-heading">Who we help</h2>
+        <p class="section-lead">From Grade 1 right through to matric — and well beyond the classroom for adult learners.</p>
+        <section class="audience-grid">
+            <article class="audience-card">
+                <span class="eyebrow">Grade 12</span>
+                <h3>Matric Students</h3>
+                <p>
+                    One-on-one and small-group tutoring in Maths, Physical Science, English, Accounting and more —
+                    built around what you actually need before the exam, not a one-size-fits-all syllabus.
+                </p>
+                <a href="tutors.html">Find your matric tutor &rarr;</a>
+            </article>
+            <article class="audience-card">
+                <span class="eyebrow">Second Chance Programme</span>
+                <h3>Adult Matric Students</h3>
+                <p>
+                    Never finished matric, or need to rewrite a subject? Our Second Chance Programme gives adult
+                    matric students a flexible, structured way to complete their National Senior Certificate —
+                    on your schedule, at your pace.
+                </p>
+                <a href="services.html">See the Second Chance Programme &rarr;</a>
+            </article>
+            <article class="audience-card">
+                <span class="eyebrow">Grade 1&ndash;12</span>
+                <h3>Homeschool Learners</h3>
+                <p>
+                    Guided support across CAPS, IEB, British and American curricula, in partnership with
+                    CambriLearn, so home education never has to mean learning alone.
+                </p>
+                <a href="services.html">See homeschool support &rarr;</a>
+            </article>
+            <article class="audience-card">
+                <span class="eyebrow">Adult Learners</span>
+                <h3>Adult Education</h3>
+                <p>
+                    From basic computer skills to literacy programmes, we help adults build practical, real-world
+                    skills for work and everyday life — alongside our matric rewrite course.
+                </p>
+                <a href="services.html">See adult programmes &rarr;</a>
+            </article>
+        </section>
+
+        <h2 class="section-heading">Why HelloEducation</h2>
+        <section class="why-grid">
+            <div class="why-card">
+                <h3>Personalised, not generic</h3>
+                <p>Every learner is different, so we shape tutoring around how each student actually learns best.</p>
+            </div>
+            <div class="why-card">
+                <h3>Neurodiverse-friendly</h3>
+                <p>Our tutors are experienced in supporting ADHD, autism spectrum and other learning differences.</p>
+            </div>
+            <div class="why-card">
+                <h3>Online or face-to-face</h3>
+                <p>Learn however suits you best — video sessions or in-person, on a schedule that works for you.</p>
+            </div>
+        </section>
+
+        <section class="home-cta">
+            <h2>Ready to get started?</h2>
+            <p>Sign in to book a session, or get in touch if you're not sure where to begin.</p>
+            <div class="hero-actions">
+                <a class="hero-btn" href="login.html">Login</a>
+                <a class="hero-btn secondary" href="contact.html">Contact Us</a>
+            </div>
         </section>
     </main>
-    
+
     <footer>
         <p>&copy; 2023 HelloEducation. All rights reserved.</p>
     </footer>
