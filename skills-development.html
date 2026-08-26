@@ -1,0 +1,308 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Practical skills development for adults — basic computer skills, MS Office and online skills, and literacy programmes, at a pace that suits you." />
+    <link rel="stylesheet" href="styling.css">
+    <link rel="manifest" href="manifest.json" />
+    <link rel="icon" href="favicon.ico" />
+    <link rel="apple-touch-icon" href="icons/apple-touch-icon.png" />
+    <meta name="theme-color" content="#085041" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="HelloEducation" />
+    <title>HelloEducation | Skills Development for Adults</title>
+    <style>
+        .back-link {
+            display: block;
+            text-align: center;
+            color: white;
+            text-decoration: none;
+            font-weight: 600;
+            margin-bottom: 1.25rem;
+        }
+        .back-link:hover {
+            text-decoration: underline;
+        }
+        .hero {
+            background: white;
+            border-radius: 12px;
+            padding: 1.75rem 1.5rem;
+            box-shadow: 0 8px 16px rgba(0, 0, 0, 0.2);
+            text-align: center;
+            max-width: 680px;
+            margin: 0 auto;
+        }
+        .hero h2 {
+            font-size: 1.4rem;
+            color: #04342C;
+            margin-bottom: 0.6rem;
+        }
+        .hero p {
+            max-width: 520px;
+            margin: 0 auto;
+            color: #333;
+            font-size: 0.95rem;
+            line-height: 1.7;
+        }
+        .hero-actions {
+            display: flex;
+            justify-content: center;
+            gap: 0.75rem;
+            flex-wrap: wrap;
+            margin-top: 1rem;
+        }
+        .hero-btn {
+            display: inline-flex;
+            align-items: center;
+            padding: 0.5rem 1.1rem;
+            border-radius: 999px;
+            background: #085041;
+            color: white;
+            text-decoration: none;
+            font-weight: 600;
+            font-size: 0.9rem;
+            transition: background-color 0.2s ease, transform 0.2s ease;
+        }
+        .hero-btn:hover {
+            background: #0F6E56;
+            transform: translateY(-2px);
+        }
+        .hero-btn.secondary {
+            background: #E1F5EE;
+            color: #04342C;
+        }
+        .hero-btn.secondary:hover {
+            background: #cdeee0;
+        }
+        .section-heading {
+            color: white;
+            text-align: center;
+            font-size: 1.55rem;
+            margin: 2.5rem 0 1rem;
+        }
+        .offer-grid {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 1.25rem;
+        }
+        .offer-card {
+            background: white;
+            border-radius: 12px;
+            padding: 1.5rem;
+            box-shadow: 0 8px 16px rgba(0, 0, 0, 0.2);
+        }
+        .offer-card .eyebrow {
+            display: inline-block;
+            background: #E1F5EE;
+            color: #04342C;
+            font-size: 0.7rem;
+            font-weight: 700;
+            letter-spacing: 0.03em;
+            text-transform: uppercase;
+            padding: 0.15rem 0.5rem;
+            border-radius: 999px;
+            margin-bottom: 0.5rem;
+        }
+        .offer-card h3 {
+            color: #04342C;
+            font-size: 1.15rem;
+            margin-bottom: 0.5rem;
+        }
+        .offer-card p {
+            color: #333;
+            font-size: 0.95rem;
+        }
+        .offer-card ul {
+            margin: 0.6rem 0 0;
+            padding-left: 1.1rem;
+            color: #333;
+            font-size: 0.92rem;
+        }
+        .offer-card li {
+            margin-bottom: 0.3rem;
+        }
+        .steps-grid {
+            display: grid;
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+            gap: 1rem;
+        }
+        .step-card {
+            background: rgba(255, 255, 255, 0.08);
+            border: 1px solid rgba(255, 255, 255, 0.25);
+            border-radius: 12px;
+            padding: 1.1rem;
+            color: white;
+        }
+        .step-number {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 1.75rem;
+            height: 1.75rem;
+            border-radius: 50%;
+            background: #E1F5EE;
+            color: #04342C;
+            font-weight: 700;
+            margin-bottom: 0.5rem;
+        }
+        .step-card h3 {
+            font-size: 1.05rem;
+            margin-bottom: 0.3rem;
+        }
+        .step-card p {
+            color: #E1F5EE;
+            font-size: 0.92rem;
+        }
+        .note-card {
+            background: white;
+            border-radius: 12px;
+            padding: 1.5rem;
+            box-shadow: 0 8px 16px rgba(0, 0, 0, 0.2);
+        }
+        .note-card p {
+            color: #333;
+            font-size: 0.95rem;
+        }
+        .page-cta {
+            background: white;
+            border-radius: 12px;
+            padding: 1.5rem;
+            margin-top: 2.5rem;
+            text-align: center;
+            box-shadow: 0 8px 16px rgba(0, 0, 0, 0.2);
+        }
+        .page-cta h2 {
+            color: #04342C;
+            font-size: 1.2rem;
+            margin-bottom: 0.4rem;
+        }
+        .page-cta p {
+            color: #333;
+            font-size: 0.9rem;
+            margin-bottom: 0.9rem;
+        }
+
+        @media (max-width: 768px) {
+            .hero {
+                padding: 1.25rem 1rem;
+            }
+            .hero h2 {
+                font-size: 1.2rem;
+            }
+            .section-heading {
+                font-size: 1.3rem;
+                margin: 1.75rem 0 0.75rem;
+            }
+            .offer-grid,
+            .steps-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <img src="images/HELLO..jpg" alt="HelloEducation" class="site-logo" />
+        <h1 class="page-heading">Skills Development</h1>
+    </header>
+    <navigation>
+        <ul>
+            <li><a href="index.html">Home</a></li>
+            <li><a href="services.html">Services</a></li>
+            <li><a href="tutors.html">Tutors</a></li>
+            <li><a href="resources.html">Resources</a></li>
+            <li><a href="contact.html">Contact</a></li>
+            <li><a href="login.html">Login</a></li>
+        </ul>
+    </navigation>
+
+    <main>
+        <a class="back-link" href="services.html">&larr; Back to Services</a>
+
+        <section class="hero">
+            <h2>Practical skills for real life</h2>
+            <p>
+                Whether you want to feel confident using a computer, brush up on reading and writing, or build a
+                skill for a new opportunity at work, our adult programmes are built around what you actually
+                need — not a one-size-fits-all course.
+            </p>
+            <div class="hero-actions">
+                <a class="hero-btn" href="contact.html">Get in Touch</a>
+                <a class="hero-btn secondary" href="tutors.html">Find a Tutor</a>
+            </div>
+        </section>
+
+        <h2 class="section-heading">What we offer</h2>
+        <section class="offer-grid">
+            <article class="offer-card">
+                <span class="eyebrow">Computer Skills</span>
+                <h3>Basic Computer Skills</h3>
+                <p>Get comfortable with computers and everyday software, at a pace that suits you:</p>
+                <ul>
+                    <li>MS Office — Word, Excel and PowerPoint</li>
+                    <li>Email and online communication</li>
+                    <li>General online and internet skills</li>
+                </ul>
+            </article>
+            <article class="offer-card">
+                <span class="eyebrow">Literacy</span>
+                <h3>Literacy Programmes</h3>
+                <p>
+                    Build stronger reading, writing and comprehension skills — whether you're starting from
+                    scratch or want to sharpen skills you already have, for work, study, or everyday confidence.
+                </p>
+            </article>
+        </section>
+
+        <h2 class="section-heading">Who this is for</h2>
+        <section class="note-card">
+            <p>
+                Adults looking to grow practical skills for work, further study, or everyday life — no matric
+                or formal qualification needed to get started. If you're looking specifically to complete or
+                rewrite your matric certificate, our <a href="second-chance.html" style="color:#0F6E56; font-weight:600;">Second Chance Programme</a> is the better fit.
+            </p>
+        </section>
+
+        <h2 class="section-heading">How it works</h2>
+        <section class="steps-grid">
+            <div class="step-card">
+                <span class="step-number">1</span>
+                <h3>Tell us what you need</h3>
+                <p>A skill, a goal, and roughly how much time you have — that's enough to get started.</p>
+            </div>
+            <div class="step-card">
+                <span class="step-number">2</span>
+                <h3>We match you with a tutor</h3>
+                <p>We pair you with a tutor experienced in teaching that skill to adult learners.</p>
+            </div>
+            <div class="step-card">
+                <span class="step-number">3</span>
+                <h3>Learn at your pace</h3>
+                <p>Sessions that fit around your schedule, online or face-to-face.</p>
+            </div>
+        </section>
+
+        <section class="page-cta">
+            <h2>Ready to build a new skill?</h2>
+            <p>Get in touch and tell us what you're looking to learn — we'll take it from there.</p>
+            <div class="hero-actions">
+                <a class="hero-btn" href="contact.html">Contact Us</a>
+                <a class="hero-btn secondary" href="tutors.html">Find a Tutor</a>
+            </div>
+        </section>
+    </main>
+
+    <footer>
+        <p>&copy; 2023 HelloEducation. All rights reserved.</p>
+    </footer>
+  <script>
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('sw.js').catch(() => {});
+      });
+    }
+  </script>
+</body>
+</html>
