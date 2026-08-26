@@ -27,6 +27,14 @@ header h1 {
   margin: 0 0 0.2rem;
 }
 
+.site-logo {
+  display: block;
+  height: 64px;
+  width: auto;
+  margin: 0 auto 0.2rem;
+  border-radius: 12px;
+}
+
 header h1.page-heading {
   font-size: 1.25rem;
   margin-bottom: 10px;
@@ -60,6 +68,10 @@ footer {
     font-size: 1rem;
     margin-bottom: 8px;
   }
+
+  .site-logo {
+    height: 52px;
+  }
 }
 
 @media (max-width: 480px) {
@@ -75,6 +87,10 @@ footer {
   header h1.page-heading {
     font-size: 0.9rem;
     margin-bottom: 6px;
+  }
+
+  .site-logo {
+    height: 44px;
   }
 }
 
