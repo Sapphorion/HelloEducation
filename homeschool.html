@@ -1,0 +1,343 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Guided homeschool learner assistance for Grade 1-12, across CAPS, IEB, British and American curricula, in partnership with CambriLearn." />
+    <link rel="stylesheet" href="styling.css">
+    <link rel="manifest" href="manifest.json" />
+    <link rel="icon" href="favicon.ico" />
+    <link rel="apple-touch-icon" href="icons/apple-touch-icon.png" />
+    <meta name="theme-color" content="#085041" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="HelloEducation" />
+    <title>HelloEducation | Homeschool Learner Assistance</title>
+    <style>
+        .back-link {
+            display: block;
+            text-align: center;
+            color: white;
+            text-decoration: none;
+            font-weight: 600;
+            margin-bottom: 1.25rem;
+        }
+        .back-link:hover {
+            text-decoration: underline;
+        }
+        .hero {
+            background: white;
+            border-radius: 12px;
+            padding: 1.75rem 1.5rem;
+            box-shadow: 0 8px 16px rgba(0, 0, 0, 0.2);
+            text-align: center;
+            max-width: 680px;
+            margin: 0 auto;
+        }
+        .hero h2 {
+            font-size: 1.4rem;
+            color: #04342C;
+            margin-bottom: 0.6rem;
+        }
+        .hero p {
+            max-width: 520px;
+            margin: 0 auto;
+            color: #333;
+            font-size: 0.95rem;
+            line-height: 1.7;
+        }
+        .hero-actions {
+            display: flex;
+            justify-content: center;
+            gap: 0.75rem;
+            flex-wrap: wrap;
+            margin-top: 1rem;
+        }
+        .hero-btn {
+            display: inline-flex;
+            align-items: center;
+            padding: 0.5rem 1.1rem;
+            border-radius: 999px;
+            background: #085041;
+            color: white;
+            text-decoration: none;
+            font-weight: 600;
+            font-size: 0.9rem;
+            transition: background-color 0.2s ease, transform 0.2s ease;
+        }
+        .hero-btn:hover {
+            background: #0F6E56;
+            transform: translateY(-2px);
+        }
+        .hero-btn.secondary {
+            background: #E1F5EE;
+            color: #04342C;
+        }
+        .hero-btn.secondary:hover {
+            background: #cdeee0;
+        }
+        .section-heading {
+            color: white;
+            text-align: center;
+            font-size: 1.55rem;
+            margin: 2.5rem 0 1rem;
+        }
+        .offer-grid {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 1.25rem;
+        }
+        .offer-card {
+            background: white;
+            border-radius: 12px;
+            padding: 1.5rem;
+            box-shadow: 0 8px 16px rgba(0, 0, 0, 0.2);
+        }
+        .offer-card .eyebrow {
+            display: inline-block;
+            background: #E1F5EE;
+            color: #04342C;
+            font-size: 0.7rem;
+            font-weight: 700;
+            letter-spacing: 0.03em;
+            text-transform: uppercase;
+            padding: 0.15rem 0.5rem;
+            border-radius: 999px;
+            margin-bottom: 0.5rem;
+        }
+        .offer-card h3 {
+            color: #04342C;
+            font-size: 1.1rem;
+            margin-bottom: 0.5rem;
+        }
+        .offer-card p {
+            color: #333;
+            font-size: 0.92rem;
+            margin-bottom: 0.75rem;
+        }
+        .offer-card a.curriculum-link {
+            color: #0F6E56;
+            font-weight: 600;
+            font-size: 0.9rem;
+            text-decoration: none;
+        }
+        .offer-card a.curriculum-link:hover {
+            text-decoration: underline;
+        }
+        .steps-grid {
+            display: grid;
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+            gap: 1rem;
+        }
+        .step-card {
+            background: rgba(255, 255, 255, 0.08);
+            border: 1px solid rgba(255, 255, 255, 0.25);
+            border-radius: 12px;
+            padding: 1.1rem;
+            color: white;
+        }
+        .step-number {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 1.75rem;
+            height: 1.75rem;
+            border-radius: 50%;
+            background: #E1F5EE;
+            color: #04342C;
+            font-weight: 700;
+            margin-bottom: 0.5rem;
+        }
+        .step-card h3 {
+            font-size: 1.05rem;
+            margin-bottom: 0.3rem;
+        }
+        .step-card p {
+            color: #E1F5EE;
+            font-size: 0.92rem;
+        }
+        .note-card {
+            background: white;
+            border-radius: 12px;
+            padding: 1.5rem;
+            box-shadow: 0 8px 16px rgba(0, 0, 0, 0.2);
+        }
+        .note-card h3 {
+            color: #04342C;
+            font-size: 1.1rem;
+            margin-bottom: 0.6rem;
+        }
+        .note-card p {
+            color: #333;
+            font-size: 0.95rem;
+        }
+        .note-card p + p,
+        .note-card p + h3 {
+            margin-top: 1rem;
+        }
+        .page-cta {
+            background: white;
+            border-radius: 12px;
+            padding: 1.5rem;
+            margin-top: 2.5rem;
+            text-align: center;
+            box-shadow: 0 8px 16px rgba(0, 0, 0, 0.2);
+        }
+        .page-cta h2 {
+            color: #04342C;
+            font-size: 1.2rem;
+            margin-bottom: 0.4rem;
+        }
+        .page-cta p {
+            color: #333;
+            font-size: 0.9rem;
+            margin-bottom: 0.9rem;
+        }
+
+        @media (max-width: 768px) {
+            .hero {
+                padding: 1.25rem 1rem;
+            }
+            .hero h2 {
+                font-size: 1.2rem;
+            }
+            .section-heading {
+                font-size: 1.3rem;
+                margin: 1.75rem 0 0.75rem;
+            }
+            .offer-grid,
+            .steps-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <img src="images/HELLO..jpg" alt="HelloEducation" class="site-logo" />
+        <h1 class="page-heading">Homeschool Learner Assistance</h1>
+    </header>
+    <navigation>
+        <ul>
+            <li><a href="index.html">Home</a></li>
+            <li><a href="services.html">Services</a></li>
+            <li><a href="tutors.html">Tutors</a></li>
+            <li><a href="resources.html">Resources</a></li>
+            <li><a href="contact.html">Contact</a></li>
+            <li><a href="login.html">Login</a></li>
+        </ul>
+    </navigation>
+
+    <main>
+        <a class="back-link" href="services.html">&larr; Back to Services</a>
+
+        <section class="hero">
+            <h2>Home education, without learning alone</h2>
+            <p>
+                Whether you're just starting to homeschool or already underway, our tutors give your child real,
+                guided support across whichever curriculum you've chosen — so home education never has to mean
+                going it alone.
+            </p>
+            <div class="hero-actions">
+                <a class="hero-btn" href="tutors.html">Find a Tutor</a>
+                <a class="hero-btn secondary" href="contact.html">Ask Us a Question</a>
+            </div>
+        </section>
+
+        <h2 class="section-heading">Curricula we support</h2>
+        <section class="offer-grid">
+            <article class="offer-card">
+                <span class="eyebrow">South Africa</span>
+                <h3>CAPS</h3>
+                <p>
+                    The Curriculum and Assessment Policy Statement — South Africa's official national school
+                    curriculum, followed by most public and private schools.
+                </p>
+                <a class="curriculum-link" href="https://cambrilearn.com/caps" target="_blank" rel="noopener">Learn about CAPS on CambriLearn &rarr;</a>
+            </article>
+            <article class="offer-card">
+                <span class="eyebrow">South Africa</span>
+                <h3>IEB</h3>
+                <p>
+                    The Independent Examinations Board — a well-established South African curriculum and
+                    assessment body used by many independent schools.
+                </p>
+                <a class="curriculum-link" href="https://cambrilearn.com/ieb-curriculum" target="_blank" rel="noopener">Learn about IEB on CambriLearn &rarr;</a>
+            </article>
+            <article class="offer-card">
+                <span class="eyebrow">International</span>
+                <h3>British Curriculum</h3>
+                <p>
+                    Internationally recognised Cambridge-style qualifications, a common choice for families
+                    wanting a curriculum that travels well across borders.
+                </p>
+                <a class="curriculum-link" href="https://cambrilearn.com/british-curriculum" target="_blank" rel="noopener">Learn about the British Curriculum on CambriLearn &rarr;</a>
+            </article>
+            <article class="offer-card">
+                <span class="eyebrow">International</span>
+                <h3>American Curriculum</h3>
+                <p>
+                    A US-style K&ndash;12 curriculum, suited to families working toward an American high school
+                    diploma or planning to study in the US.
+                </p>
+                <a class="curriculum-link" href="https://cambrilearn.com/k12-curriculum" target="_blank" rel="noopener">Learn about the American Curriculum on CambriLearn &rarr;</a>
+            </article>
+        </section>
+
+        <h2 class="section-heading">How HelloEducation fits in</h2>
+        <section class="note-card">
+            <p>
+                We work in association with <a href="https://cambrilearn.com" target="_blank" rel="noopener" style="color:#0F6E56; font-weight:600;">CambriLearn</a>,
+                who provide the accredited homeschool curriculum itself. You enrol in your chosen curriculum
+                directly with them — what HelloEducation adds on top is a qualified tutor who works with your
+                child through that curriculum, subject by subject, so they get real one-on-one guidance rather
+                than working through the material alone.
+            </p>
+            <h3>Who this is for</h3>
+            <p>
+                Grade 1&ndash;12 learners already homeschooling on one of the curricula above, or families
+                exploring homeschooling and wanting support choosing a curriculum and getting started with it.
+            </p>
+        </section>
+
+        <h2 class="section-heading">How it works</h2>
+        <section class="steps-grid">
+            <div class="step-card">
+                <span class="step-number">1</span>
+                <h3>Choose a curriculum</h3>
+                <p>Pick CAPS, IEB, British or American — or tell us if you're not sure yet and need guidance.</p>
+            </div>
+            <div class="step-card">
+                <span class="step-number">2</span>
+                <h3>We match you with a tutor</h3>
+                <p>We pair your child with a tutor experienced in that curriculum and the subjects they need.</p>
+            </div>
+            <div class="step-card">
+                <span class="step-number">3</span>
+                <h3>Learn together, on your terms</h3>
+                <p>Regular sessions, online or face-to-face, that fit around your family's homeschool routine.</p>
+            </div>
+        </section>
+
+        <section class="page-cta">
+            <h2>Ready to get support for your homeschool learner?</h2>
+            <p>Browse our tutors, or get in touch and we'll help you find the right fit.</p>
+            <div class="hero-actions">
+                <a class="hero-btn" href="tutors.html">Find a Tutor</a>
+                <a class="hero-btn secondary" href="contact.html">Contact Us</a>
+            </div>
+        </section>
+    </main>
+
+    <footer>
+        <p>&copy; 2023 HelloEducation. All rights reserved.</p>
+    </footer>
+  <script>
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('sw.js').catch(() => {});
+      });
+    }
+  </script>
+</body>
+</html>
