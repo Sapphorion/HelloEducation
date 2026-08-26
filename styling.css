@@ -6,7 +6,7 @@
 
 body {
   font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-  background: linear-gradient(125deg, #3074f3 0%, #2a9b1b 80%);
+  background: #085041;
   min-height: 100vh;
   padding: 20px 20px 40px;
   line-height: 1.6;
@@ -93,7 +93,7 @@ navigation a {
   display: inline-block;
   text-decoration: none;
   color: #fff;
-  background: #43a547;
+  background: #085041;
   padding: 0.5rem 1rem;
   border-radius: 6px;
   font-weight: 600;
@@ -101,9 +101,9 @@ navigation a {
   transition: background-color 120ms ease, transform 80ms ease;
   white-space: nowrap;
 }
-navigation a:hover { 
-  background: #368d3f; 
-  transform: translateY(-2px); 
+navigation a:hover {
+  background: #0F6E56;
+  transform: translateY(-2px);
 }
 
 .auth-section {
@@ -198,7 +198,7 @@ navigation a:hover {
 }
 
 .auth-tab.active {
-  background: #43a547;
+  background: #085041;
   color: white;
 }
 
@@ -229,7 +229,7 @@ navigation a:hover {
 }
 
 .admin-subnav a.active {
-  background: #43a547;
+  background: #085041;
   color: white;
 }
 
@@ -296,7 +296,7 @@ navigation a:hover {
   font-size: 1.35rem;
   margin: 0;
   padding-bottom: 0.5rem;
-  border-bottom: 2px solid #43a547;
+  border-bottom: 2px solid #085041;
 }
 
 .dashboard-grid {
@@ -403,7 +403,7 @@ navigation a:hover {
 a.action-btn {
   display: inline-flex;
   align-items: center;
-  background-color: #43a547;
+  background-color: #085041;
   color: white;
   text-decoration: none;
   font-weight: 600;
@@ -411,7 +411,7 @@ a.action-btn {
 }
 
 a.action-btn:hover {
-  background-color: #368d3f;
+  background-color: #0F6E56;
 }
 
 a.action-btn.secondary {
@@ -424,8 +424,8 @@ a.action-btn.secondary {
 
 .status-badge {
   display: inline-block;
-  background: #dbeafe;
-  color: #1d4ed8;
+  background: #E1F5EE;
+  color: #04342C;
   border-radius: 999px;
   padding: 0.2rem 0.55rem;
   font-size: 0.75rem;
@@ -629,16 +629,16 @@ a.action-btn.secondary {
 }
 
 .availability-cell:hover {
-  background: #dbeafe;
+  background: #E1F5EE;
 }
 
 .availability-cell.active {
-  background: #43a547;
-  border-color: #368d3f;
+  background: #085041;
+  border-color: #0F6E56;
 }
 
 .availability-cell.active:hover {
-  background: #368d3f;
+  background: #0F6E56;
 }
 
 .availability-cell:disabled {
@@ -754,7 +754,7 @@ a.action-btn.secondary {
 }
 
 button {
-  background-color: #43a547;
+  background-color: #085041;
   color: white;
   padding: 10px 20px;
   border: none;
@@ -763,10 +763,10 @@ button {
   font-size: 16px;
   font-weight: 600;
   transition: background-color 0.3s ease;
-  
+
 }
 button:hover {
-  background-color: #368d3f;
+  background-color: #0F6E56;
 }
 
 .btn-stack {
@@ -783,7 +783,7 @@ button:hover {
 
 .book-btn {
   display: inline-block;
-  background-color: #43a547;
+  background-color: #085041;
   color: white;
   padding: 10px 20px;
   border: none;
@@ -799,7 +799,7 @@ button:hover {
 }
 
 .book-btn:hover {
-  background-color: #368d3f;
+  background-color: #0F6E56;
 }
 
 @media (max-width: 480px) {
