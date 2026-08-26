@@ -29,7 +29,7 @@ header h1 {
 
 .site-logo {
   display: block;
-  height: 188px;
+  height: 210px;
   width: auto;
   margin: 0 auto 0.2rem;
   border-radius: 12px;
@@ -70,7 +70,7 @@ footer {
   }
 
   .site-logo {
-    height: 150px;
+    height: 168px;
   }
 }
 
@@ -90,7 +90,7 @@ footer {
   }
 
   .site-logo {
-    height: 132px;
+    height: 148px;
   }
 }
 
@@ -110,10 +110,10 @@ navigation a {
   text-decoration: none;
   color: #fff;
   background: #085041;
-  padding: 0.5rem 1rem;
+  padding: 0.6rem 1.15rem;
   border-radius: 6px;
   font-weight: 600;
-  font-size: 0.95rem;
+  font-size: 1.05rem;
   transition: background-color 120ms ease, transform 80ms ease;
   white-space: nowrap;
 }
