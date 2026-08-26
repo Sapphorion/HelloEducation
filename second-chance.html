@@ -152,12 +152,37 @@
             padding: 1.5rem;
             box-shadow: 0 8px 16px rgba(0, 0, 0, 0.2);
         }
+        .note-card h3 {
+            color: #04342C;
+            font-size: 1.1rem;
+            margin-bottom: 0.6rem;
+        }
         .note-card p {
             color: #333;
             font-size: 0.95rem;
         }
-        .note-card p + p {
-            margin-top: 0.75rem;
+        .note-card p + p,
+        .note-card ul + h3,
+        .note-card p + h3 {
+            margin-top: 1rem;
+        }
+        .note-card ul {
+            margin: 0.5rem 0 0;
+            padding-left: 1.2rem;
+            color: #333;
+            font-size: 0.95rem;
+        }
+        .note-card li {
+            margin-bottom: 0.4rem;
+        }
+        .note-card li a {
+            color: #0F6E56;
+            font-weight: 600;
+        }
+        .note-card .source-note {
+            font-size: 0.8rem;
+            color: #64748b;
+            margin-top: 1rem;
         }
         .page-cta {
             background: white;
@@ -275,12 +300,40 @@
             </div>
         </section>
 
+        <h2 class="section-heading">About the DBE's Second Chance Matric Programme</h2>
         <section class="note-card">
             <p>
-                The Second Chance Programme runs separately from our general tutoring — it's a fixed-timetable
-                programme built specifically around what adult matric students need: a real class, a real
-                teacher, and a clear path to a finished certificate.
+                "Second Chance" is also the name of a free national programme run by South Africa's Department
+                of Basic Education (DBE), for anyone who needs to rewrite failed subjects, improve their marks,
+                or complete an outstanding National Senior Certificate (NSC) or Senior Certificate (SC).
             </p>
+            <ul>
+                <li>NSC candidates who wrote matric from 2008 onwards, rewriting or improving subjects, or completing an outstanding NSC</li>
+                <li>Senior Certificate (adult) candidates aged 18 and older, writing in June</li>
+                <li>Part-time NSC candidates who previously attempted the exams post-2008, writing in May/June or November</li>
+            </ul>
+            <p>
+                Registering and sitting exams through the DBE's programme is completely free — the DBE explicitly
+                states it does not endorse any private or commercial service that charges for participation in
+                the programme itself. The DBE also provides its own free support: face-to-face classes at
+                learning centres around the country, TV and radio broadcasts, digital courses, past exam papers,
+                and the "Mind the Gap" study guides.
+            </p>
+            <h3>How HelloEducation fits in</h3>
+            <p>
+                We're not affiliated with the DBE, and we don't charge for anything the DBE already provides
+                free. What we offer instead is the teaching layer many students still need on top of that: a
+                dedicated tutor, a small weekly class, and someone tracking your progress subject by subject.
+                You still register for your exams directly with the DBE — we're here to help you actually pass
+                them.
+            </p>
+            <h3>Official DBE resources</h3>
+            <ul>
+                <li><a href="https://www.gov.za/services/services-residents/education-and-training/basic-education/register-rewrite-matric-subjects" target="_blank" rel="noopener">Register to rewrite matric subjects</a> — South African Government Services</li>
+                <li><a href="https://www.education.gov.za/Programmes/SecondChanceProgramme.aspx" target="_blank" rel="noopener">Second Chance Matric Programme</a> — Department of Basic Education</li>
+                <li>DBE Second Chance contact: <a href="mailto:SecondChance@dbe.gov.za">SecondChance@dbe.gov.za</a> or +27 63 696 7246</li>
+            </ul>
+            <p class="source-note">Information above is drawn from the Department of Basic Education and South African Government Services websites. Programme details, dates and contact information can change — always confirm current requirements directly with the DBE before registering.</p>
         </section>
 
         <section class="page-cta">
