@@ -44,6 +44,11 @@
       <div class="dashboard-card">
         <h3>My availability</h3>
         <p class="card-hint">Click the hours you're free — this repeats every week, so toggling e.g. Monday 9am applies to every Monday, not just the date shown. Students and parents see these as bookable windows. Click again to remove an hour.</p>
+        <div class="week-nav">
+          <button id="availabilityPrevWeekBtn" class="action-btn secondary" type="button">&larr; Previous</button>
+          <span class="week-nav-label" id="availabilityWeekLabel"></span>
+          <button id="availabilityNextWeekBtn" class="action-btn secondary" type="button">Next &rarr;</button>
+        </div>
         <div class="availability-grid-wrapper" id="availabilityGrid"><p>Loading…</p></div>
       </div>
 
@@ -111,14 +116,15 @@
       return `${displayHour}${period}`;
     }
 
-    // This week's dates (Sunday-first, matching DAY_NAMES) purely so the
-    // grid's column headers read like a real calendar. Availability itself
-    // is still a weekly-recurring pattern, not tied to these specific
-    // dates — toggling a cell applies to that weekday every week.
-    function getCurrentWeekDates() {
+    // Dates for the displayed week (Sunday-first, matching DAY_NAMES) purely
+    // so the grid's column headers read like a real calendar. Availability
+    // itself is still a weekly-recurring pattern, not tied to these specific
+    // dates — toggling a cell applies to that weekday every week, regardless
+    // of which week is currently being viewed.
+    function getWeekDates(offset) {
       const now = new Date();
       const sunday = new Date(now);
-      sunday.setDate(now.getDate() - now.getDay());
+      sunday.setDate(now.getDate() - now.getDay() + offset * 7);
       sunday.setHours(0, 0, 0, 0);
       return Array.from({ length: 7 }, (_, i) => {
         const d = new Date(sunday);
@@ -129,6 +135,12 @@
 
     function isSameDate(a, b) {
       return a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
+    }
+
+    function weekRangeLabel(weekDates) {
+      const start = weekDates[0];
+      const end = weekDates[6];
+      return `${start.toLocaleDateString(undefined, { day: 'numeric', month: 'short' })} – ${end.toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' })}`;
     }
 
     // Auto-generates a free Jitsi Meet video call room — no account, API key,
@@ -155,6 +167,9 @@
     const summaryText = document.getElementById('summaryText');
     const requestList = document.getElementById('requestList');
     const availabilityGrid = document.getElementById('availabilityGrid');
+    const availabilityWeekLabel = document.getElementById('availabilityWeekLabel');
+    const availabilityPrevWeekBtn = document.getElementById('availabilityPrevWeekBtn');
+    const availabilityNextWeekBtn = document.getElementById('availabilityNextWeekBtn');
     const logSessionForm = document.getElementById('logSessionForm');
     const sessionFeedback = document.getElementById('sessionFeedback');
     const mySessionsList = document.getElementById('mySessionsList');
@@ -264,10 +279,14 @@
       return map;
     }
 
+    let availabilityWeekOffset = 0;
+
     function renderAvailabilityGrid() {
       const index = buildAvailabilityIndex(availabilitySlots);
-      const weekDates = getCurrentWeekDates();
+      const weekDates = getWeekDates(availabilityWeekOffset);
       const today = new Date();
+
+      availabilityWeekLabel.textContent = weekRangeLabel(weekDates);
 
       const headerRow = `<tr><th></th>${weekDates.map((d, dayOfWeek) => `<th${isSameDate(d, today) ? ' style="color:#085041;"' : ''}>${DAY_NAMES[dayOfWeek].slice(0, 3)}<br>${d.getDate()}</th>`).join('')}</tr>`;
       const bodyRows = AVAILABILITY_HOURS.map((hour) => {
@@ -319,6 +338,16 @@
         button.disabled = false;
         alert(error.message || 'Could not update availability.');
       }
+    });
+
+    availabilityPrevWeekBtn.addEventListener('click', () => {
+      availabilityWeekOffset -= 1;
+      renderAvailabilityGrid();
+    });
+
+    availabilityNextWeekBtn.addEventListener('click', () => {
+      availabilityWeekOffset += 1;
+      renderAvailabilityGrid();
     });
 
     logSessionForm.addEventListener('submit', async (event) => {

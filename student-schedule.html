@@ -65,6 +65,11 @@
                 <span><i class="swatch-booked"></i> Already booked</span>
                 <span><i class="swatch-selected"></i> Selected</span>
               </div>
+              <div class="week-nav">
+                <button id="bookingPrevWeekBtn" class="action-btn secondary" type="button">&larr; Previous</button>
+                <span class="week-nav-label" id="bookingWeekLabel"></span>
+                <button id="bookingNextWeekBtn" class="action-btn secondary" type="button">Next &rarr;</button>
+              </div>
               <div class="availability-grid-wrapper" id="bookingCalendar"></div>
               <p class="card-hint" id="selectedTimeLabel">No time selected yet.</p>
             </div>
@@ -129,6 +134,9 @@
     const requestTutor = document.getElementById('requestTutor');
     const bookingCalendarWrapper = document.getElementById('bookingCalendarWrapper');
     const bookingCalendar = document.getElementById('bookingCalendar');
+    const bookingWeekLabel = document.getElementById('bookingWeekLabel');
+    const bookingPrevWeekBtn = document.getElementById('bookingPrevWeekBtn');
+    const bookingNextWeekBtn = document.getElementById('bookingNextWeekBtn');
     const selectedTimeLabel = document.getElementById('selectedTimeLabel');
     const requestSubject = document.getElementById('requestSubject');
     const requestFeedback = document.getElementById('requestFeedback');
@@ -142,23 +150,37 @@
       const displayHour = hour % 12 === 0 ? 12 : hour % 12;
       return `${displayHour}${period}`;
     }
-    function getNext7Days() {
-      const start = new Date();
-      start.setHours(0, 0, 0, 0);
+    const MAX_WEEKS_AHEAD = 11; // ~3 months of bookable horizon
+
+    // Sunday-first dates for the week `offset` weeks from the current one,
+    // matching the tutor's own availability grid so "Monday" always lines
+    // up with the same weekday across both pages.
+    function getWeekDates(offset) {
+      const now = new Date();
+      const sunday = new Date(now);
+      sunday.setDate(now.getDate() - now.getDay() + offset * 7);
+      sunday.setHours(0, 0, 0, 0);
       return Array.from({ length: 7 }, (_, i) => {
-        const d = new Date(start);
-        d.setDate(start.getDate() + i);
+        const d = new Date(sunday);
+        d.setDate(sunday.getDate() + i);
         return d;
       });
     }
 
-    let selectedDateTime = null;
+    function weekRangeLabel(days) {
+      return `${days[0].toLocaleDateString(undefined, { day: 'numeric', month: 'short' })} – ${days[6].toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' })}`;
+    }
 
-    // Renders a 7-day x hourly grid for the chosen tutor: green = the
-    // tutor's recurring weekly availability lands on this date, amber =
+    let selectedDateTime = null;
+    let bookingWeekOffset = 0;
+    let currentBookingTutorId = null;
+
+    // Renders a 7-day x hourly grid for the chosen tutor and week: green =
+    // the tutor's recurring weekly availability lands on this date, amber =
     // available but a session is already booked then, grey = past or not
     // offered. Clicking a green cell selects that exact date/time.
     async function renderBookingCalendar(tutorId) {
+      currentBookingTutorId = tutorId;
       selectedDateTime = null;
       selectedTimeLabel.textContent = 'No time selected yet.';
 
@@ -169,8 +191,11 @@
       }
       bookingCalendarWrapper.style.display = '';
       bookingCalendar.innerHTML = '<p>Loading…</p>';
+      bookingWeekLabel.textContent = weekRangeLabel(getWeekDates(bookingWeekOffset));
+      bookingPrevWeekBtn.disabled = bookingWeekOffset <= 0;
+      bookingNextWeekBtn.disabled = bookingWeekOffset >= MAX_WEEKS_AHEAD;
 
-      const days = getNext7Days();
+      const days = getWeekDates(bookingWeekOffset);
       const rangeStart = Timestamp.fromDate(days[0]);
       const rangeEndDate = new Date(days[6]);
       rangeEndDate.setDate(rangeEndDate.getDate() + 1);
@@ -298,7 +323,20 @@
       const tutorId = requestTutor.value;
       const selectedOption = requestTutor.options[requestTutor.selectedIndex];
       requestSubject.value = selectedOption.dataset.subject || '';
+      bookingWeekOffset = 0;
       await renderBookingCalendar(tutorId);
+    });
+
+    bookingPrevWeekBtn.addEventListener('click', () => {
+      if (bookingWeekOffset <= 0) return;
+      bookingWeekOffset -= 1;
+      renderBookingCalendar(currentBookingTutorId);
+    });
+
+    bookingNextWeekBtn.addEventListener('click', () => {
+      if (bookingWeekOffset >= MAX_WEEKS_AHEAD) return;
+      bookingWeekOffset += 1;
+      renderBookingCalendar(currentBookingTutorId);
     });
 
     requestSessionForm.addEventListener('submit', async (event) => {
