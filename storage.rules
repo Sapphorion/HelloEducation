@@ -19,7 +19,7 @@ service firebase.storage {
       );
       allow write: if request.auth != null
         && request.auth.uid == studentId
-        && request.resource.size < 10 * 1024 * 1024;
+        && request.resource.size < 25 * 1024 * 1024;
     }
 
     // Same pattern as assignment-submissions above, for the matric re-write
@@ -39,7 +39,7 @@ service firebase.storage {
       );
       allow write: if request.auth != null
         && request.auth.uid == studentId
-        && request.resource.size < 10 * 1024 * 1024;
+        && request.resource.size < 25 * 1024 * 1024;
     }
 
     // Study resource / assignment attachments (worksheets, PDFs, etc.) a
@@ -60,7 +60,7 @@ service firebase.storage {
       allow read: if request.auth != null;
       allow write: if request.auth != null
         && request.auth.uid == uid
-        && request.resource.size < 10 * 1024 * 1024;
+        && request.resource.size < 25 * 1024 * 1024;
     }
 
     // Tutor profile photos shown on the public (unauthenticated) tutors.html
