@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>HelloEducation Student — Schedule</title>
+  <title>HelloEducation Parent — Schedule</title>
   <link rel="stylesheet" href="styling.css" />
   <link rel="manifest" href="manifest.json" />
   <link rel="icon" href="favicon.ico" />
@@ -16,7 +16,7 @@
 <body>
   <header>
     <h1>HelloEducation</h1>
-    <h1 class="page-heading">Student — Schedule</h1>
+    <h1 class="page-heading">Parent — Schedule</h1>
   </header>
 
   <navigation>
@@ -31,30 +31,22 @@
   <main class="auth-page">
     <section class="auth-panel dashboard-panel">
       <div class="admin-subnav">
-        <a href="student-dashboard.html">Overview</a>
-        <a href="student-schedule.html" class="active">Schedule</a>
-        <a href="student-assignments.html">Assignments</a>
-        <a href="student-help.html">Help</a>
+        <a href="parent-dashboard.html">Overview</a>
+        <a href="parent-children.html">My Children</a>
+        <a href="parent-schedule.html" class="active">Schedule</a>
+        <a href="parent-billing.html">Billing</a>
       </div>
 
       <h2 id="welcomeMessage">Schedule</h2>
-      <p id="summaryText">Upcoming sessions, request a new one, and your progress &amp; feedback.</p>
-
-      <div class="dashboard-grid dashboard-grid-2">
-        <div class="dashboard-card">
-          <h3>Upcoming sessions</h3>
-          <ul id="upcomingSessions"><li>Loading…</li></ul>
-        </div>
-        <div class="dashboard-card">
-          <h3>Available tutors</h3>
-          <ul id="tutorList"><li>Loading…</li></ul>
-        </div>
-      </div>
+      <p id="summaryText">Book a session for one of your children.</p>
 
       <div class="dashboard-grid dashboard-grid-2">
         <div class="dashboard-card">
           <h3>Request a session</h3>
           <form id="requestSessionForm" class="admin-form">
+            <select id="requestChild" required>
+              <option value="">Choose a child…</option>
+            </select>
             <select id="requestTutor" required>
               <option value="">Choose a tutor…</option>
             </select>
@@ -79,14 +71,9 @@
           <p class="auth-feedback" id="requestFeedback"></p>
         </div>
         <div class="dashboard-card">
-          <h3>My requests</h3>
+          <h3>Pending requests</h3>
           <ul id="myRequestsList"><li>Loading…</li></ul>
         </div>
-      </div>
-
-      <div class="dashboard-card">
-        <h3>Progress &amp; feedback</h3>
-        <ul id="progressList"><li>Loading…</li></ul>
       </div>
 
       <button id="signOutBtn" type="button">Sign Out</button>
@@ -100,7 +87,7 @@
   <script type="module">
     import { initializeApp } from 'https://www.gstatic.com/firebasejs/12.4.0/firebase-app.js';
     import { getAuth, onAuthStateChanged, signOut } from 'https://www.gstatic.com/firebasejs/12.4.0/firebase-auth.js';
-    import { getFirestore, collection, query, where, orderBy, getDocs, updateDoc, doc, Timestamp } from 'https://www.gstatic.com/firebasejs/12.4.0/firebase-firestore.js';
+    import { getFirestore, collection, query, where, getDocs, updateDoc, doc, getDoc, Timestamp } from 'https://www.gstatic.com/firebasejs/12.4.0/firebase-firestore.js';
     import { getFunctions, httpsCallable } from 'https://www.gstatic.com/firebasejs/12.4.0/firebase-functions.js';
     import { firebaseConfig, isFirebaseConfigured } from './firebase-config.js';
 
@@ -111,8 +98,8 @@
     }
 
     const role = localStorage.getItem('helloEducationRole');
-    if (role !== 'student') {
-      window.location.href = 'login.html?role=student';
+    if (role !== 'parent') {
+      window.location.href = 'login.html?role=parent';
     }
 
     const app = initializeApp(firebaseConfig);
@@ -122,10 +109,8 @@
     const requestSessionCallable = httpsCallable(functions, 'requestSession');
     const welcomeMessage = document.getElementById('welcomeMessage');
     const summaryText = document.getElementById('summaryText');
-    const upcomingSessions = document.getElementById('upcomingSessions');
-    const tutorList = document.getElementById('tutorList');
-    const progressList = document.getElementById('progressList');
     const requestSessionForm = document.getElementById('requestSessionForm');
+    const requestChild = document.getElementById('requestChild');
     const requestTutor = document.getElementById('requestTutor');
     const bookingCalendarWrapper = document.getElementById('bookingCalendarWrapper');
     const bookingCalendar = document.getElementById('bookingCalendar');
@@ -152,7 +137,36 @@
       });
     }
 
+    let childUids = [];
     let selectedDateTime = null;
+
+    async function populateChildSelect() {
+      const parentDoc = await getDoc(doc(db, 'users', auth.currentUser.uid));
+      childUids = (parentDoc.exists() && parentDoc.data().childUids) || [];
+
+      if (!childUids.length) {
+        requestChild.innerHTML = '<option value="">No linked children yet</option>';
+        return;
+      }
+
+      const children = await Promise.all(childUids.map(async (uid) => {
+        const snap = await getDoc(doc(db, 'students', uid));
+        return snap.exists() ? { id: uid, ...snap.data() } : null;
+      }));
+
+      requestChild.innerHTML = '<option value="">Choose a child…</option>' + children
+        .filter(Boolean)
+        .map((c) => `<option value="${c.id}">${c.name}</option>`)
+        .join('');
+    }
+
+    async function populateTutorSelect() {
+      const snapshot = await getDocs(collection(db, 'tutors'));
+      const tutors = snapshot.docs.map((docSnap) => ({ id: docSnap.id, ...docSnap.data() }));
+      requestTutor.innerHTML = '<option value="">Choose a tutor…</option>' + tutors.map((tutor) =>
+        `<option value="${tutor.id}" data-subject="${tutor.subject}">${tutor.name} — ${tutor.subject}</option>`
+      ).join('');
+    }
 
     // Renders a 7-day x hourly grid for the chosen tutor: green = the
     // tutor's recurring weekly availability lands on this date, amber =
@@ -243,57 +257,6 @@
       selectedTimeLabel.textContent = `Selected: ${selectedDateTime.toLocaleString()}`;
     });
 
-    async function renderSessions() {
-      if (!auth.currentUser) return;
-      const sessionsQuery = query(
-        collection(db, 'sessions'),
-        where('studentId', '==', auth.currentUser.uid),
-        orderBy('scheduledAt', 'desc')
-      );
-      const snapshot = await getDocs(sessionsQuery);
-      const sessions = snapshot.docs.map((docSnap) => ({ id: docSnap.id, ...docSnap.data() }));
-
-      const upcoming = sessions.filter((s) => s.status === 'scheduled').reverse();
-      upcomingSessions.innerHTML = upcoming.length
-        ? upcoming.map((s) => `<li>${s.subject} — ${s.scheduledAt.toDate().toLocaleString()} <span class="status-badge">${formatLabel(s)}</span>${s.meetingLink ? ` — <a href="${s.meetingLink}" target="_blank" rel="noopener">Join session</a>` : ''}</li>`).join('')
-        : '<li>No upcoming sessions scheduled.</li>';
-
-      const past = sessions.filter((s) => s.status === 'completed');
-      progressList.innerHTML = past.length
-        ? past.map((s) => `<li><span>${s.subject} — ${s.scheduledAt.toDate().toLocaleDateString()} <span class="status-badge">${formatLabel(s)}</span>${s.notes ? `<br>${s.notes}` : ''}</span></li>`).join('')
-        : '<li>No session feedback yet.</li>';
-
-      const pending = sessions.filter((s) => s.status === 'pending');
-      myRequestsList.innerHTML = pending.length
-        ? pending.map((s) => `
-          <li>
-            <span>${s.subject} — ${s.scheduledAt.toDate().toLocaleString()} <span class="status-badge">${formatLabel(s)}</span> <span class="status-badge">pending</span></span>
-            <button class="action-btn secondary" data-session-id="${s.id}" type="button">Cancel</button>
-          </li>
-        `).join('')
-        : '<li>No pending requests.</li>';
-    }
-
-    myRequestsList.addEventListener('click', async (event) => {
-      const button = event.target.closest('button[data-session-id]');
-      if (!button) return;
-      await updateDoc(doc(db, 'sessions', button.dataset.sessionId), { status: 'cancelled' });
-      await renderSessions();
-    });
-
-    async function populateTutorSelect() {
-      const snapshot = await getDocs(collection(db, 'tutors'));
-      const tutors = snapshot.docs.map((docSnap) => ({ id: docSnap.id, ...docSnap.data() }));
-
-      requestTutor.innerHTML = '<option value="">Choose a tutor…</option>' + tutors.map((tutor) =>
-        `<option value="${tutor.id}" data-subject="${tutor.subject}">${tutor.name} — ${tutor.subject}</option>`
-      ).join('');
-
-      tutorList.innerHTML = tutors.length
-        ? tutors.map((tutor) => `<li>${tutor.name} — ${tutor.subject}</li>`).join('')
-        : '<li>No tutors listed yet.</li>';
-    }
-
     requestTutor.addEventListener('change', async () => {
       const tutorId = requestTutor.value;
       const selectedOption = requestTutor.options[requestTutor.selectedIndex];
@@ -304,6 +267,11 @@
     requestSessionForm.addEventListener('submit', async (event) => {
       event.preventDefault();
 
+      const studentId = requestChild.value;
+      if (!studentId) {
+        requestFeedback.textContent = 'Choose which child this session is for.';
+        return;
+      }
       if (!selectedDateTime) {
         requestFeedback.textContent = 'Click an available hour on the calendar first.';
         return;
@@ -317,14 +285,42 @@
       const notes = document.getElementById('requestNotes').value.trim();
 
       try {
-        await requestSessionCallable({ tutorId, subject, scheduledAt: selectedDateTime.toISOString(), format, notes });
+        await requestSessionCallable({ studentId, tutorId, subject, scheduledAt: selectedDateTime.toISOString(), format, notes });
         requestFeedback.textContent = 'Request sent! The tutor will confirm or decline it.';
         requestSessionForm.reset();
         await renderBookingCalendar(null);
-        await renderSessions();
+        await renderRequests();
       } catch (error) {
         requestFeedback.textContent = error.message || 'Could not send the request.';
       }
+    });
+
+    async function renderRequests() {
+      if (!childUids.length) {
+        myRequestsList.innerHTML = '<li>No linked children yet.</li>';
+        return;
+      }
+
+      const perChild = await Promise.all(childUids.map((uid) =>
+        getDocs(query(collection(db, 'sessions'), where('studentId', '==', uid), where('status', '==', 'pending')))
+      ));
+      const pending = perChild.flatMap((snap) => snap.docs.map((d) => ({ id: d.id, ...d.data() })));
+
+      myRequestsList.innerHTML = pending.length
+        ? pending.map((s) => `
+          <li>
+            <span>${s.studentEmail || 'Student'} — ${s.subject} — ${s.scheduledAt.toDate().toLocaleString()} <span class="status-badge">${formatLabel(s)}</span> <span class="status-badge">pending</span></span>
+            <button class="action-btn secondary" data-session-id="${s.id}" type="button">Cancel</button>
+          </li>
+        `).join('')
+        : '<li>No pending requests.</li>';
+    }
+
+    myRequestsList.addEventListener('click', async (event) => {
+      const button = event.target.closest('button[data-session-id]');
+      if (!button) return;
+      await updateDoc(doc(db, 'sessions', button.dataset.sessionId), { status: 'cancelled' });
+      await renderRequests();
     });
 
     onAuthStateChanged(auth, async (user) => {
@@ -335,19 +331,20 @@
       }
 
       if (!user) {
-        window.location.href = 'login.html?role=student';
+        window.location.href = 'login.html?role=parent';
         return;
       }
 
-      renderSessions();
+      await populateChildSelect();
       populateTutorSelect();
+      renderRequests();
     });
 
     signOutBtn.addEventListener('click', async () => {
       if (!isFirebaseConfigured()) {
         localStorage.removeItem('helloEducationRole');
         localStorage.removeItem('helloEducationUser');
-        window.location.href = 'login.html?role=student';
+        window.location.href = 'login.html?role=parent';
         return;
       }
 

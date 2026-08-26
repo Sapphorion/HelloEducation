@@ -100,8 +100,10 @@ service cloud.firestore {
       allow update: if signedIn() && (
         isAdmin(request.auth.uid)
         || resource.data.tutorId == request.auth.uid
-        // A student may only withdraw their own still-pending request.
-        || (resource.data.studentId == request.auth.uid
+        // A student (or their parent) may only withdraw a still-pending
+        // request — same condition either way, just a different identity
+        // check for who "owns" the request.
+        || ((resource.data.studentId == request.auth.uid || isParentOf(resource.data.studentId))
             && resource.data.status == 'pending'
             && request.resource.data.status == 'cancelled')
       );

@@ -645,6 +645,50 @@ a.action-btn.secondary {
   opacity: 0.6;
 }
 
+.availability-cell.selected {
+  outline: 3px solid #0F6E56;
+  outline-offset: 1px;
+}
+
+.availability-cell.booked {
+  background: #fef3c7;
+  border-color: #fde68a;
+  cursor: not-allowed;
+}
+
+.availability-cell.past {
+  background: #f1f5f9;
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+.calendar-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.9rem;
+  margin: 0.5rem 0 0.75rem;
+  font-size: 0.75rem;
+  color: #64748b;
+}
+
+.calendar-legend span {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+}
+
+.calendar-legend i {
+  display: inline-block;
+  width: 12px;
+  height: 12px;
+  border-radius: 3px;
+  border: 1px solid #e2e8f0;
+}
+
+.calendar-legend .swatch-available { background: #085041; border-color: #0F6E56; }
+.calendar-legend .swatch-booked { background: #fef3c7; border-color: #fde68a; }
+.calendar-legend .swatch-selected { background: #085041; outline: 2px solid #0F6E56; outline-offset: 1px; }
+
 .session-hero {
   background: #f8fafc;
   border: 1px solid #e2e8f0;

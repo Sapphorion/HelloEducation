@@ -430,8 +430,35 @@ exports.deleteAccount = onCall(async (request) => {
 // a client-side check-then-write has a race window two students could both
 // slip through.
 exports.requestSession = onCall(async (request) => {
-  const student = await requireStudent(request.auth);
-  const { tutorId, subject, scheduledAt, notes, format } = request.data || {};
+  const callerUid = request.auth?.uid;
+  if (!callerUid) {
+    throw new HttpsError('unauthenticated', 'You must be signed in.');
+  }
+  const callerDoc = await db.doc(`users/${callerUid}`).get();
+  const callerRole = callerDoc.exists ? callerDoc.data().role : null;
+  if (callerRole !== 'student' && callerRole !== 'parent') {
+    throw new HttpsError('permission-denied', 'Only a student or parent can request a session.');
+  }
+
+  const { tutorId, subject, scheduledAt, notes, format, studentId: requestedStudentId } = request.data || {};
+
+  let student;
+  if (callerRole === 'student') {
+    student = { uid: callerUid, email: callerDoc.data().email };
+  } else {
+    // Parent booking on behalf of a child — childUids is only ever set by
+    // an admin (see the users/{uid} update rule), so it's safe to trust
+    // directly off the parent's own doc without a second round-trip.
+    const childUids = callerDoc.data().childUids || [];
+    if (!requestedStudentId || !childUids.includes(requestedStudentId)) {
+      throw new HttpsError('permission-denied', 'You can only book sessions for your own linked children.');
+    }
+    const studentDoc = await db.doc(`users/${requestedStudentId}`).get();
+    if (!studentDoc.exists) {
+      throw new HttpsError('not-found', 'That student account was not found.');
+    }
+    student = { uid: requestedStudentId, email: studentDoc.data().email };
+  }
 
   if (!tutorId || typeof tutorId !== 'string') {
     throw new HttpsError('invalid-argument', 'A tutor is required.');

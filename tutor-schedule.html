@@ -43,7 +43,7 @@
 
       <div class="dashboard-card">
         <h3>My availability</h3>
-        <p class="card-hint">Click the hours you're free each week — students see these as bookable windows. Click again to remove an hour.</p>
+        <p class="card-hint">Click the hours you're free — this repeats every week, so toggling e.g. Monday 9am applies to every Monday, not just the date shown. Students and parents see these as bookable windows. Click again to remove an hour.</p>
         <div class="availability-grid-wrapper" id="availabilityGrid"><p>Loading…</p></div>
       </div>
 
@@ -109,6 +109,26 @@
       const period = hour < 12 ? 'am' : 'pm';
       const displayHour = hour % 12 === 0 ? 12 : hour % 12;
       return `${displayHour}${period}`;
+    }
+
+    // This week's dates (Sunday-first, matching DAY_NAMES) purely so the
+    // grid's column headers read like a real calendar. Availability itself
+    // is still a weekly-recurring pattern, not tied to these specific
+    // dates — toggling a cell applies to that weekday every week.
+    function getCurrentWeekDates() {
+      const now = new Date();
+      const sunday = new Date(now);
+      sunday.setDate(now.getDate() - now.getDay());
+      sunday.setHours(0, 0, 0, 0);
+      return Array.from({ length: 7 }, (_, i) => {
+        const d = new Date(sunday);
+        d.setDate(sunday.getDate() + i);
+        return d;
+      });
+    }
+
+    function isSameDate(a, b) {
+      return a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
     }
 
     // Auto-generates a free Jitsi Meet video call room — no account, API key,
@@ -246,8 +266,10 @@
 
     function renderAvailabilityGrid() {
       const index = buildAvailabilityIndex(availabilitySlots);
+      const weekDates = getCurrentWeekDates();
+      const today = new Date();
 
-      const headerRow = `<tr><th></th>${DAY_NAMES.map((d) => `<th>${d.slice(0, 3)}</th>`).join('')}</tr>`;
+      const headerRow = `<tr><th></th>${weekDates.map((d, dayOfWeek) => `<th${isSameDate(d, today) ? ' style="color:#085041;"' : ''}>${DAY_NAMES[dayOfWeek].slice(0, 3)}<br>${d.getDate()}</th>`).join('')}</tr>`;
       const bodyRows = AVAILABILITY_HOURS.map((hour) => {
         const startTime = `${pad2(hour)}:00`;
         const cells = DAY_NAMES.map((_, dayOfWeek) => {
