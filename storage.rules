@@ -62,5 +62,18 @@ service firebase.storage {
         && request.auth.uid == uid
         && request.resource.size < 10 * 1024 * 1024;
     }
+
+    // Tutor profile photos shown on the public (unauthenticated) tutors.html
+    // page, so unlike everything else in this file, read has to be open to
+    // anyone. Only an admin can upload one, via the tutor-profile editor in
+    // admin-accounts.html.
+    match /tutor-photos/{uid}/{fileName} {
+      function isAdmin() {
+        return firestore.get(/databases/(default)/documents/users/$(request.auth.uid)).data.role == 'admin';
+      }
+
+      allow read: if true;
+      allow write: if request.auth != null && isAdmin() && request.resource.size < 5 * 1024 * 1024;
+    }
   }
 }

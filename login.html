@@ -78,6 +78,19 @@
     const roleFromUrl = params.get('role');
     let activeRole = VALID_ROLES.includes(roleFromUrl) ? roleFromUrl : 'student';
 
+    // Arrives here from a tutor's "Book a Session" link on the public
+    // tutors.html page — carried through to the booking pages below so the
+    // student/parent lands with that tutor already selected, instead of
+    // losing the context they came in with.
+    const tutorId = params.get('tutorId');
+
+    function destinationUrl(role) {
+      if (tutorId && (role === 'student' || role === 'parent')) {
+        return `${DASHBOARD_URLS[role].replace('-dashboard.html', '-schedule.html')}?tutorId=${encodeURIComponent(tutorId)}`;
+      }
+      return DASHBOARD_URLS[role];
+    }
+
     const tabs = document.querySelectorAll('.auth-tab');
     const form = document.getElementById('authForm');
     const title = document.getElementById('authTitle');
@@ -137,7 +150,7 @@
         localStorage.setItem('helloEducationRole', activeRole);
         localStorage.setItem('helloEducationUser', email);
         feedback.textContent = 'Demo mode active. Your sign-in preview is ready.';
-        window.location.href = DASHBOARD_URLS[activeRole];
+        window.location.href = destinationUrl(activeRole);
         return;
       }
 
@@ -162,7 +175,7 @@
         localStorage.setItem('helloEducationRole', activeRole);
         localStorage.setItem('helloEducationUser', userCredential.user.email || '');
         feedback.textContent = 'Signing you in...';
-        window.location.href = DASHBOARD_URLS[activeRole];
+        window.location.href = destinationUrl(activeRole);
       } catch (error) {
         feedback.textContent = error.message || 'Unable to sign in.';
       }

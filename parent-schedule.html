@@ -369,8 +369,20 @@
       }
 
       await populateChildSelect();
-      populateTutorSelect();
+      await populateTutorSelect();
       renderRequests();
+
+      // Arrives here from a tutor's "Book a Session" link on the public
+      // tutors.html page (carried through login.html) — pre-select that
+      // tutor and open the calendar instead of leaving the parent to find
+      // them again in the dropdown. They still need to pick which child.
+      const tutorIdFromUrl = new URLSearchParams(window.location.search).get('tutorId');
+      if (tutorIdFromUrl && requestTutor.querySelector(`option[value="${CSS.escape(tutorIdFromUrl)}"]`)) {
+        requestTutor.value = tutorIdFromUrl;
+        const selectedOption = requestTutor.options[requestTutor.selectedIndex];
+        requestSubject.value = selectedOption.dataset.subject || '';
+        await renderBookingCalendar(tutorIdFromUrl);
+      }
     });
 
     signOutBtn.addEventListener('click', async () => {

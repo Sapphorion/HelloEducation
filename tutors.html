@@ -3,6 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Meet HelloEducation's tutors and book a session — matric, general Grade 1-12 tutoring, homeschool support and more." />
     <link rel="stylesheet" href="styling.css">
     <link rel="manifest" href="manifest.json" />
     <link rel="icon" href="favicon.ico" />
@@ -18,7 +19,7 @@
             padding: 0;
             box-sizing: border-box;
         }
-        
+
         body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
             background: #085041;
@@ -42,33 +43,24 @@
             width: 100%;
         }
 
-        h1 {
-            text-align: center;
-            color: white;
-            margin: 0;
-            font-size: 2.1rem;
-        }
-
-        h1.logo {
-            margin-bottom: 0.2rem;
-        }
-
         .page-heading {
             font-size: 1.25rem;
             margin-bottom: 10px;
         }
-        
+
+        .tutors-status {
+            color: white;
+            text-align: center;
+            grid-column: 1 / -1;
+        }
+
         .tutors-grid {
             display: grid;
             grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
             gap: 20px;
         }
-        
-        @media (max-width: 768px) {
-            h1 {
-                font-size: 1.6rem;
-            }
 
+        @media (max-width: 768px) {
             .page-heading {
                 font-size: 1rem;
                 margin-bottom: 8px;
@@ -90,94 +82,100 @@
         }
 
         @media (max-width: 480px) {
-            h1 {
-                font-size: 1.4rem;
-            }
-
             .page-heading {
                 font-size: 0.9rem;
                 margin-bottom: 6px;
             }
-            
+
             .tutor-name {
                 font-size: 1.2em;
             }
-            
+
             .tutor-subject {
                 font-size: 0.9em;
             }
-            
+
             .tutor-bio {
                 font-size: 0.85em;
                 margin-bottom: 12px;
             }
-            
-            .tutor-image {
+
+            .tutor-image,
+            .tutor-image-placeholder {
                 width: 140px;
                 height: 140px;
             }
-            
+
             .tutor-info {
                 padding: 15px;
             }
         }
-        
+
         .tutor-card {
             background: white;
             border-radius: 12px;
             overflow: hidden;
             box-shadow: 0 8px 16px rgba(0, 0, 0, 0.2);
             transition: transform 0.3s, box-shadow 0.3s;
-            cursor: pointer;
         }
-        
+
         .tutor-card:hover {
             transform: translateY(-8px);
             box-shadow: 0 12px 24px rgba(0, 0, 0, 0.3);
         }
-        
-        .tutor-image {
+
+        .tutor-image,
+        .tutor-image-placeholder {
             width: 160px;
             height: 160px;
-            object-fit: cover;
-            object-position: center;
             display: block;
             margin: 20px auto 0;
             border-radius: 12px;
+        }
+
+        .tutor-image {
+            object-fit: cover;
+            object-position: center;
             background: #e0e0e0;
         }
-        
+
+        .tutor-image-placeholder {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: #E1F5EE;
+            color: #085041;
+            font-size: 3rem;
+            font-weight: 700;
+        }
+
         .tutor-info {
             padding: 20px;
         }
-        
+
         .tutor-name {
             font-size: 1.5em;
             font-weight: bold;
             color: #333;
             margin-bottom: 8px;
         }
-        
+
         .tutor-subject {
-            color: #667eea;
+            color: #0F6E56;
             font-weight: 600;
             margin-bottom: 12px;
         }
-        
+
         .tutor-bio {
             color: #666;
             font-size: 0.95em;
             margin-bottom: 16px;
             line-height: 1.5;
         }
-        
+
         @media (max-width: 768px) {
             body {
                 padding: 16px 15px 30px;
-            }
-
-            h1 {
-                font-size: 1.6rem;
             }
 
             .page-heading {
@@ -194,7 +192,7 @@
                 grid-template-columns: 1fr;
                 gap: 20px;
             }
-            
+
             .tutor-bio {
                 font-size: 0.9em;
                 margin-bottom: 12px;
@@ -219,39 +217,61 @@
     </navigation>
     <main>
         <div class="container">
-        <div class="tutors-grid">
-            <!-- Tutor Card 1 -->
-            <div class="tutor-card">
-                <img src="images/Gemini_Generated_Image_ehs1xsehs1xsehs1.png" alt="Nicole" class="tutor-image">
-                <div class="tutor-info">
-                    <div class="tutor-name">Nicole</div>
-                    <div class="tutor-subject">Grade 3 - Post matric</div>
-                    <div class="tutor-bio"> I have a passion for education and helping students achieve their goals. I specialise in Mathematics, Science, Life Science, Accounting and CAT. 
-                        I am experienced in working with students of all levels and have a strong background in dealing with learners with learning barriers. I have over 10 years of teaching experience under my belt, from working in a classroom to online education. 
-                        I believe everyone is capable of learning and achieving success with the right support and guidance.</div>
-                    <!-- replace the href value with your Google Form link for Nicole -->
-                    <a class="book-btn" href="https://forms.gle/WbmgNmn2Uryqdcs49" target="_blank" rel="noopener">Book a Session</a>
-                </div>
+            <div class="tutors-grid" id="tutorsGrid">
+                <p class="tutors-status">Loading tutors&hellip;</p>
             </div>
-            
-            <!-- Tutor Card 3 -->
-            <div class="tutor-card">
-                <img src="images/WhatsApp Image 2026-02-01 at 5.31.58 PM.jpeg" alt="Karen" class="tutor-image">
-                <div class="tutor-info">
-                    <div class="tutor-name">Karen</div>
-                    <div class="tutor-subject">Grade 3 - 9</div>
-                    <div class="tutor-bio">I am passionate about the little ones and making learning fun for them. I specialise in building confidence in reading and writing skills for young learners.
-                        I also focus on foundational mathematics to ensure a strong base for future learning. My teaching style is interactive and engaging, using games and activities to make lessons enjoyable.
-                    </div>
-                    <!-- replace the href value with your Google Form link for Karen -->
-                    <a class="book-btn" href="https://forms.gle/WbmgNmn2Uryqdcs49" target="_blank" rel="noopener">Book a Session</a>
-                </div>
-            </div>
-        </div>
         </div>
     </main>
-    
 
+  <script type="module">
+    import { initializeApp } from 'https://www.gstatic.com/firebasejs/12.4.0/firebase-app.js';
+    import { getFunctions, httpsCallable } from 'https://www.gstatic.com/firebasejs/12.4.0/firebase-functions.js';
+    import { firebaseConfig, isFirebaseConfigured } from './firebase-config.js';
+
+    const tutorsGrid = document.getElementById('tutorsGrid');
+
+    function renderTutorCard(tutor) {
+      const imageHtml = tutor.photoUrl
+        ? `<img src="${tutor.photoUrl}" alt="${tutor.name}" class="tutor-image">`
+        : `<div class="tutor-image-placeholder">${(tutor.name || '?').trim().charAt(0).toUpperCase()}</div>`;
+
+      return `
+        <div class="tutor-card">
+          ${imageHtml}
+          <div class="tutor-info">
+            <div class="tutor-name">${tutor.name}</div>
+            ${tutor.subject ? `<div class="tutor-subject">${tutor.subject}</div>` : ''}
+            ${tutor.bio ? `<div class="tutor-bio">${tutor.bio}</div>` : ''}
+            <a class="book-btn" href="login.html?tutorId=${encodeURIComponent(tutor.id)}">Book a Session</a>
+          </div>
+        </div>
+      `;
+    }
+
+    async function loadTutors() {
+      if (!isFirebaseConfigured()) {
+        tutorsGrid.innerHTML = '<p class="tutors-status">Demo mode is active. Connect Firebase to see real tutors.</p>';
+        return;
+      }
+
+      const app = initializeApp(firebaseConfig);
+      const functions = getFunctions(app);
+      const getPublicTutorsCallable = httpsCallable(functions, 'getPublicTutors');
+
+      try {
+        const result = await getPublicTutorsCallable();
+        const tutors = result.data.tutors || [];
+
+        tutorsGrid.innerHTML = tutors.length
+          ? tutors.map(renderTutorCard).join('')
+          : '<p class="tutors-status">No tutors listed right now — please check back soon.</p>';
+      } catch (error) {
+        tutorsGrid.innerHTML = `<p class="tutors-status">${error.message || 'Could not load tutors right now. Please try again shortly.'}</p>`;
+      }
+    }
+
+    loadTutors();
+  </script>
   <script>
     if ('serviceWorker' in navigator) {
       window.addEventListener('load', () => {

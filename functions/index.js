@@ -549,6 +549,34 @@ exports.getTutorBookedTimes = onCall(async (request) => {
   return { bookedTimes };
 });
 
+// The public (unauthenticated) tutors.html page can't read the tutors
+// collection directly — its Firestore rule requires signedIn() — and even
+// if it could, a raw collection read would expose every tutor's email and
+// the admin uid that created them. This returns just the fields the public
+// page actually needs, for tutors an admin has marked visible.
+exports.getPublicTutors = onCall(async (request) => {
+  const snapshot = await db.collection('tutors').get();
+
+  // A tutor is public unless explicitly hidden — matches the admin editor's
+  // own default (admin-accounts.html's status <select> shows "Visible" for
+  // anything that isn't literally 'inactive'), rather than requiring every
+  // doc to have status: 'active' set, which older/hand-created docs won't.
+  const tutors = snapshot.docs
+    .filter((docSnap) => docSnap.data().status !== 'inactive')
+    .map((docSnap) => {
+      const data = docSnap.data();
+      return {
+        id: docSnap.id,
+        name: data.name || '',
+        subject: data.subject || '',
+        bio: data.bio || '',
+        photoUrl: data.photoUrl || ''
+      };
+    });
+
+  return { tutors };
+});
+
 // Slots a matric re-write student into an open class group for a subject.
 // Server-side because it has to search across matricGroups for room and then
 // write two documents (the group roster and the student's subject list) —
