@@ -105,7 +105,7 @@
   <script type="module">
     import { initializeApp } from 'https://www.gstatic.com/firebasejs/12.4.0/firebase-app.js';
     import { getAuth, onAuthStateChanged, signOut } from 'https://www.gstatic.com/firebasejs/12.4.0/firebase-auth.js';
-    import { getFirestore, collection, query, where, orderBy, getDocs, updateDoc, doc, Timestamp } from 'https://www.gstatic.com/firebasejs/12.4.0/firebase-firestore.js';
+    import { getFirestore, collection, query, where, orderBy, getDocs, updateDoc, doc } from 'https://www.gstatic.com/firebasejs/12.4.0/firebase-firestore.js';
     import { getFunctions, httpsCallable } from 'https://www.gstatic.com/firebasejs/12.4.0/firebase-functions.js';
     import { firebaseConfig, isFirebaseConfigured } from './firebase-config.js';
 
@@ -125,6 +125,7 @@
     const db = getFirestore(app);
     const functions = getFunctions(app);
     const requestSessionCallable = httpsCallable(functions, 'requestSession');
+    const getTutorBookedTimesCallable = httpsCallable(functions, 'getTutorBookedTimes');
     const welcomeMessage = document.getElementById('welcomeMessage');
     const summaryText = document.getElementById('summaryText');
     const upcomingSessions = document.getElementById('upcomingSessions');
@@ -196,20 +197,19 @@
       bookingNextWeekBtn.disabled = bookingWeekOffset >= MAX_WEEKS_AHEAD;
 
       const days = getWeekDates(bookingWeekOffset);
-      const rangeStart = Timestamp.fromDate(days[0]);
       const rangeEndDate = new Date(days[6]);
       rangeEndDate.setDate(rangeEndDate.getDate() + 1);
-      const rangeEnd = Timestamp.fromDate(rangeEndDate);
 
-      const [availabilitySnap, sessionsSnap] = await Promise.all([
-        getDocs(query(collection(db, 'availability'), where('tutorId', '==', tutorId))),
-        getDocs(query(
-          collection(db, 'sessions'),
-          where('tutorId', '==', tutorId),
-          where('scheduledAt', '>=', rangeStart),
-          where('scheduledAt', '<', rangeEnd)
-        ))
-      ]);
+      let availabilitySnap, bookedResult;
+      try {
+        [availabilitySnap, bookedResult] = await Promise.all([
+          getDocs(query(collection(db, 'availability'), where('tutorId', '==', tutorId))),
+          getTutorBookedTimesCallable({ tutorId, rangeStart: days[0].toISOString(), rangeEnd: rangeEndDate.toISOString() })
+        ]);
+      } catch (error) {
+        bookingCalendar.innerHTML = `<p>${error.message || 'Could not load the tutor\'s availability. Please try again.'}</p>`;
+        return;
+      }
 
       const slots = availabilitySnap.docs.map((d) => d.data());
       const availableIndex = new Set();
@@ -222,12 +222,7 @@
         }
       });
 
-      const bookedTimes = new Set(
-        sessionsSnap.docs
-          .map((d) => d.data())
-          .filter((s) => s.status === 'scheduled' || s.status === 'pending')
-          .map((s) => s.scheduledAt.toDate().getTime())
-      );
+      const bookedTimes = new Set(bookedResult.data.bookedTimes);
 
       const now = new Date();
       const headerRow = `<tr><th></th>${days.map((d) => `<th>${DAY_NAMES[d.getDay()].slice(0, 3)}<br>${d.getDate()}</th>`).join('')}</tr>`;

@@ -510,6 +510,45 @@ exports.requestSession = onCall(async (request) => {
   return { sessionId: sessionRef.id };
 });
 
+// The booking calendar (student/parent "Request a session") needs to know
+// which hours are already taken for a tutor, but the sessions collection's
+// security rule can't prove a client-side query filtered by an arbitrary
+// tutorId is safe (it only allows resource.data.tutorId == request.auth.uid,
+// i.e. the tutor querying their own sessions) — and even if it could, a
+// student/parent has no business reading other families' session details
+// (email, subject, notes) just to render busy/free cells. So this returns
+// only the bare timestamps of already-booked slots for the requested tutor
+// and range, nothing else.
+exports.getTutorBookedTimes = onCall(async (request) => {
+  const callerUid = request.auth?.uid;
+  if (!callerUid) {
+    throw new HttpsError('unauthenticated', 'You must be signed in.');
+  }
+
+  const { tutorId, rangeStart, rangeEnd } = request.data || {};
+  if (!tutorId || typeof tutorId !== 'string') {
+    throw new HttpsError('invalid-argument', 'A tutor is required.');
+  }
+  const start = new Date(rangeStart);
+  const end = new Date(rangeEnd);
+  if (!rangeStart || !rangeEnd || Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) {
+    throw new HttpsError('invalid-argument', 'A valid date range is required.');
+  }
+
+  const snapshot = await db.collection('sessions')
+    .where('tutorId', '==', tutorId)
+    .where('scheduledAt', '>=', Timestamp.fromDate(start))
+    .where('scheduledAt', '<', Timestamp.fromDate(end))
+    .get();
+
+  const bookedTimes = snapshot.docs
+    .map((docSnap) => docSnap.data())
+    .filter((s) => s.status === 'scheduled' || s.status === 'pending')
+    .map((s) => s.scheduledAt.toDate().getTime());
+
+  return { bookedTimes };
+});
+
 // Slots a matric re-write student into an open class group for a subject.
 // Server-side because it has to search across matricGroups for room and then
 // write two documents (the group roster and the student's subject list) —
