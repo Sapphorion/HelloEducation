@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="description" content="HelloEducation offers one-on-one matric tutoring and a Second Chance Programme for adults finishing their matric certificate, plus homeschool and adult education support across South Africa." />
+    <meta name="description" content="HelloEducation offers one-on-one tutoring for Grade 1-12 and matric students, a Second Chance Programme for adults finishing their matric certificate, plus homeschool support and skills development across South Africa." />
     <link rel="stylesheet" href="styling.css">
     <link rel="manifest" href="manifest.json" />
     <link rel="icon" href="favicon.ico" />
@@ -17,20 +17,23 @@
         .hero {
             background: white;
             border-radius: 12px;
-            padding: 1.5rem 1.5rem;
+            padding: 1.75rem 1.5rem;
             box-shadow: 0 8px 16px rgba(0, 0, 0, 0.2);
             text-align: center;
+            max-width: 620px;
+            margin: 0 auto;
         }
         .hero h2 {
             font-size: 1.3rem;
             color: #04342C;
-            margin-bottom: 0.5rem;
+            margin-bottom: 0.6rem;
         }
         .hero p {
-            max-width: 560px;
+            max-width: 460px;
             margin: 0 auto;
             color: #333;
             font-size: 0.95rem;
+            line-height: 1.7;
         }
         .hero-actions {
             display: flex;
@@ -77,7 +80,7 @@
         }
         .audience-grid {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+            grid-template-columns: repeat(3, minmax(0, 1fr));
             gap: 1rem;
         }
         .audience-card {
@@ -172,11 +175,17 @@
                 font-size: 1.05rem;
                 margin: 1.5rem 0 0.5rem;
             }
+            .audience-grid {
+                grid-template-columns: repeat(2, minmax(0, 1fr));
+            }
         }
 
         @media (max-width: 480px) {
             .hero {
                 padding: 1rem 0.85rem;
+            }
+            .audience-grid {
+                grid-template-columns: 1fr;
             }
         }
     </style>
@@ -184,7 +193,7 @@
 <body>
     <header>
         <img src="images/HELLO..jpg" alt="HelloEducation" class="site-logo" />
-        <h1 class="page-heading">Matric &amp; Adult Matric Tutoring</h1>
+        <h1 class="page-heading">The first word of the future is, Hello!</h1>
     </header>
     <navigation>
         <ul>
@@ -215,6 +224,15 @@
         <p class="section-lead">From Grade 1 right through to matric — and well beyond the classroom for adult learners.</p>
         <section class="audience-grid">
             <article class="audience-card">
+                <span class="eyebrow">Grade 1&ndash;12</span>
+                <h3>General Tutoring</h3>
+                <p>
+                    Our bread and butter: one-on-one or small-group tutoring across the full curriculum — Maths,
+                    Science, Languages and more — for learners who just need steady, structured support.
+                </p>
+                <a href="tutors.html">Find a tutor &rarr;</a>
+            </article>
+            <article class="audience-card">
                 <span class="eyebrow">Grade 12</span>
                 <h3>Matric Students</h3>
                 <p>
@@ -234,7 +252,7 @@
                 <a href="services.html">See the Second Chance Programme &rarr;</a>
             </article>
             <article class="audience-card">
-                <span class="eyebrow">Grade 1&ndash;12</span>
+                <span class="eyebrow">Homeschool</span>
                 <h3>Homeschool Learners</h3>
                 <p>
                     Guided support across CAPS, IEB, British and American curricula, in partnership with
@@ -244,12 +262,12 @@
             </article>
             <article class="audience-card">
                 <span class="eyebrow">Adult Learners</span>
-                <h3>Adult Education</h3>
+                <h3>Skills Development</h3>
                 <p>
                     From basic computer skills to literacy programmes, we help adults build practical, real-world
-                    skills for work and everyday life — alongside our matric rewrite course.
+                    skills for work and everyday life.
                 </p>
-                <a href="services.html">See adult programmes &rarr;</a>
+                <a href="services.html">See skills programmes &rarr;</a>
             </article>
         </section>
 
