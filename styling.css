@@ -167,7 +167,7 @@ navigation a:hover {
 .auth-page {
   display: flex;
   justify-content: center;
-  margin: 2rem 0;
+  margin: 2rem auto;
 }
 
 .auth-panel {
