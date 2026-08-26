@@ -56,19 +56,25 @@
         <h3>Log a session</h3>
         <p class="card-hint">This is what students and their linked parents see as schedule and progress/feedback. Leave notes blank for an upcoming session, or fill them in once it's done. Scheduled sessions get a video call link automatically — no need to create one yourself.</p>
         <form id="logSessionForm" class="admin-form">
-          <select id="sessionStudentPicker" data-fill-target="sessionStudentEmail"><option value="">My students (optional — or type an email below)</option></select>
-          <input id="sessionStudentEmail" type="email" placeholder="Student email" required />
-          <input id="sessionSubject" type="text" placeholder="Subject" required />
-          <input id="sessionDateTime" type="datetime-local" required />
-          <select id="sessionFormat" required>
-            <option value="online">Online</option>
-            <option value="faceToFace">Face-to-face</option>
-          </select>
-          <select id="sessionStatus" required>
-            <option value="scheduled">Scheduled</option>
-            <option value="completed">Completed</option>
-            <option value="cancelled">Cancelled</option>
-          </select>
+          <div class="form-row">
+            <select id="sessionStudentPicker" data-fill-target="sessionStudentEmail"><option value="">My students (optional — or type an email below)</option></select>
+            <input id="sessionStudentEmail" type="email" placeholder="Student email" required />
+          </div>
+          <div class="form-row">
+            <input id="sessionSubject" type="text" placeholder="Subject" required />
+            <input id="sessionDateTime" type="datetime-local" required />
+          </div>
+          <div class="form-row">
+            <select id="sessionFormat" required>
+              <option value="online">Online</option>
+              <option value="faceToFace">Face-to-face</option>
+            </select>
+            <select id="sessionStatus" required>
+              <option value="scheduled">Scheduled</option>
+              <option value="completed">Completed</option>
+              <option value="cancelled">Cancelled</option>
+            </select>
+          </div>
           <textarea id="sessionNotes" placeholder="Notes / feedback (optional)" rows="2"></textarea>
           <button type="submit">Save session</button>
         </form>

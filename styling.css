@@ -586,44 +586,43 @@ a.action-btn.secondary {
 
 .availability-grid {
   border-collapse: collapse;
-  width: 100%;
-  min-width: 560px;
+  width: auto;
+  margin: 0 auto;
 }
 
 .availability-grid th {
-  font-size: 0.75rem;
+  font-size: 0.7rem;
   color: #64748b;
   font-weight: 700;
-  padding: 0.3rem;
+  padding: 0.2rem;
   text-align: center;
 }
 
 .availability-grid td {
-  padding: 0.15rem;
+  padding: 0.1rem;
+  text-align: center;
 }
 
 .availability-grid th:first-child,
 .availability-grid td:first-child {
   text-align: right;
-  padding-right: 0.5rem;
-  font-size: 0.75rem;
+  padding-right: 0.4rem;
+  font-size: 0.7rem;
   color: #64748b;
   white-space: nowrap;
 }
 
 .availability-cell {
   display: block;
-  width: 100%;
-  aspect-ratio: 1;
-  min-width: 34px;
-  min-height: 30px;
+  width: 28px;
+  height: 26px;
   padding: 0;
   border: 1px solid #e2e8f0;
   border-radius: 6px;
   background: #f8fafc;
   color: white;
   font-weight: 700;
-  font-size: 0.8rem;
+  font-size: 0.75rem;
   cursor: pointer;
   transition: background-color 0.15s ease;
 }
@@ -669,6 +668,16 @@ a.action-btn.secondary {
   display: flex;
   flex-direction: column;
   gap: 0.6rem;
+}
+
+.form-row {
+  display: flex;
+  gap: 0.6rem;
+}
+
+.form-row > * {
+  flex: 1;
+  min-width: 0;
 }
 
 .admin-form input,
@@ -746,10 +755,14 @@ a.action-btn.secondary {
     gap: 0.3rem;
     padding-top: 10px;
   }
-  
+
   navigation a {
     padding: 0.45rem 0.7rem;
     font-size: 0.8rem;
+  }
+
+  .form-row {
+    flex-direction: column;
   }
 }
 
