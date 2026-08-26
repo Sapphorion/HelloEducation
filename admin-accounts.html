@@ -95,6 +95,18 @@
       </div>
 
       <div class="dashboard-card">
+        <h3>Assign a student to a parent</h3>
+        <p class="card-hint">Links a student to a parent's account after signup — same as the linked-children list on "Grant a role", just quicker for adding one at a time. A parent can have more than one linked child.</p>
+        <form id="assignParentForm" class="admin-form">
+          <select id="assignParentStudent" required><option value="">Choose a student…</option></select>
+          <select id="assignParentParent" required><option value="">Choose a parent…</option></select>
+          <button type="submit">Assign</button>
+        </form>
+        <p class="auth-feedback" id="assignParentFeedback"></p>
+        <ul id="parentChildrenList"><li>Loading…</li></ul>
+      </div>
+
+      <div class="dashboard-card">
         <h3>All accounts</h3>
         <p class="card-hint">Every account on the platform. Change a role, disable sign-in without losing their data, or permanently delete an account.</p>
         <div class="accounts-filter">
@@ -179,6 +191,11 @@
     const assignTutorTutor = document.getElementById('assignTutorTutor');
     const assignTutorFeedback = document.getElementById('assignTutorFeedback');
     const studentTutorList = document.getElementById('studentTutorList');
+    const assignParentForm = document.getElementById('assignParentForm');
+    const assignParentStudent = document.getElementById('assignParentStudent');
+    const assignParentParent = document.getElementById('assignParentParent');
+    const assignParentFeedback = document.getElementById('assignParentFeedback');
+    const parentChildrenList = document.getElementById('parentChildrenList');
     const accountsDirectory = document.getElementById('accountsDirectory');
     const accountsSearch = document.getElementById('accountsSearch');
     const accountsRoleFilter = document.getElementById('accountsRoleFilter');
@@ -279,6 +296,59 @@
       await renderStudentTutorAssignment();
     });
 
+    async function renderParentChildAssignment() {
+      const parentsQuery = query(collection(db, 'users'), where('role', '==', 'parent'));
+      const parentsSnap = await getDocs(parentsQuery);
+      const parents = parentsSnap.docs
+        .map((d) => ({ id: d.id, ...d.data() }))
+        .sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+
+      assignParentStudent.innerHTML = '<option value="">Choose a student…</option>' + allStudents
+        .map((s) => `<option value="${s.id}">${s.name} — ${s.email}</option>`)
+        .join('');
+      assignParentParent.innerHTML = '<option value="">Choose a parent…</option>' + parents
+        .map((p) => `<option value="${p.id}">${p.name || p.email} — ${p.email}</option>`)
+        .join('');
+
+      const studentNameById = Object.fromEntries(allStudents.map((s) => [s.id, `${s.name} (${s.email})`]));
+      const linked = parents.filter((p) => (p.childUids || []).length > 0);
+
+      parentChildrenList.innerHTML = linked.length
+        ? linked.map((p) => `
+          <li>
+            <div><strong>${p.name || p.email}</strong> — ${p.email}</div>
+            <div class="dashboard-actions">
+              ${(p.childUids || []).map((childId) => `<button class="action-btn secondary" data-unassign-parent="${p.id}" data-unassign-child="${childId}" type="button">Remove ${studentNameById[childId] || childId}</button>`).join('')}
+            </div>
+          </li>
+        `).join('')
+        : '<li>No students linked to a parent yet.</li>';
+    }
+
+    assignParentForm.addEventListener('submit', async (event) => {
+      event.preventDefault();
+      assignParentFeedback.textContent = 'Assigning…';
+
+      const studentId = assignParentStudent.value;
+      const parentId = assignParentParent.value;
+
+      try {
+        await updateDoc(doc(db, 'users', parentId), { childUids: arrayUnion(studentId) });
+        assignParentFeedback.textContent = 'Assigned.';
+        assignParentForm.reset();
+        await renderParentChildAssignment();
+      } catch (error) {
+        assignParentFeedback.textContent = error.message || 'Could not link this student.';
+      }
+    });
+
+    parentChildrenList.addEventListener('click', async (event) => {
+      const button = event.target.closest('button[data-unassign-parent]');
+      if (!button) return;
+      await updateDoc(doc(db, 'users', button.dataset.unassignParent), { childUids: arrayRemove(button.dataset.unassignChild) });
+      await renderParentChildAssignment();
+    });
+
     let allAccounts = [];
 
     async function renderAccountsDirectory() {
@@ -360,6 +430,7 @@
         await renderAccountsDirectory();
         await renderTutorDirectory();
         await renderStudentTutorAssignment();
+        await renderParentChildAssignment();
         return;
       }
 
@@ -378,6 +449,7 @@
         await renderAccountsDirectory();
         await renderTutorDirectory();
         await renderStudentTutorAssignment();
+        await renderParentChildAssignment();
       }
     });
 
@@ -424,6 +496,8 @@
           await updateDoc(doc(db, 'users', userDocSnap.id), updates);
           await ensureRoleProfileDoc(userDocSnap.id, button.dataset.role, currentData.name || '', currentData.email || '');
           roleLookupResult.innerHTML = `<p>Updated. Current role: <strong>${roleLabel(button.dataset.role)}</strong></p>`;
+          await renderStudentTutorAssignment();
+          await renderParentChildAssignment();
         });
       });
 
@@ -434,6 +508,7 @@
           const childUids = Array.from(document.getElementById('editChildrenSelect').selectedOptions).map((o) => o.value);
           await updateDoc(doc(db, 'users', userDocSnap.id), { childUids });
           roleLookupResult.innerHTML = `<p>Linked ${childUids.length} student(s).</p>`;
+          await renderParentChildAssignment();
         });
       }
     });
@@ -469,6 +544,9 @@
         if (role === 'tutor' || role === 'student') {
           await renderStudentTutorAssignment();
         }
+        if (role === 'student' || role === 'parent') {
+          await renderParentChildAssignment();
+        }
         await renderAccountsDirectory();
       } catch (error) {
         createAccountResult.innerHTML = `<p>${error.message || 'Could not create the account.'}</p>`;
@@ -497,7 +575,7 @@
 
       renderTutorDirectory();
       renderAccountsDirectory();
-      renderStudentTutorAssignment();
+      renderStudentTutorAssignment().then(renderParentChildAssignment);
     });
 
     signOutBtn.addEventListener('click', async () => {
