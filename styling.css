@@ -110,10 +110,10 @@ navigation a {
   text-decoration: none;
   color: #fff;
   background: #085041;
-  padding: 0.6rem 1.15rem;
+  padding: 0.65rem 1.25rem;
   border-radius: 6px;
   font-weight: 600;
-  font-size: 1.05rem;
+  font-size: 1.2rem;
   transition: background-color 120ms ease, transform 80ms ease;
   white-space: nowrap;
 }
