@@ -1,0 +1,328 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>HelloEducation Tutor — Student</title>
+  <link rel="stylesheet" href="styling.css" />
+  <link rel="manifest" href="manifest.json" />
+  <link rel="icon" href="favicon.ico" />
+  <link rel="apple-touch-icon" href="icons/apple-touch-icon.png" />
+  <meta name="theme-color" content="#085041" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="HelloEducation" />
+</head>
+<body>
+  <header>
+    <h1>HelloEducation</h1>
+    <h1 class="page-heading" id="pageHeading">Tutor — Student</h1>
+  </header>
+
+  <navigation>
+    <ul>
+      <li><a href="index.html">Home</a></li>
+      <li><a href="services.html">Services</a></li>
+      <li><a href="tutors.html">Tutors</a></li>
+      <li><a href="contact.html">Contact</a></li>
+    </ul>
+  </navigation>
+
+  <main class="auth-page">
+    <section class="auth-panel dashboard-panel">
+      <div class="admin-subnav">
+        <a href="tutor-dashboard.html">Overview</a>
+        <a href="tutor-schedule.html">Schedule</a>
+        <a href="tutor-students.html" class="active">Students</a>
+        <a href="tutor-materials.html">Materials</a>
+        <a href="tutor-second-chance.html">Second Chance</a>
+      </div>
+
+      <p><a href="tutor-students.html">&larr; Back to Students</a></p>
+
+      <h2 id="welcomeMessage">Student</h2>
+      <p class="card-hint" id="summaryText">Everything for this student in one place.</p>
+
+      <div class="dashboard-grid dashboard-grid-2">
+        <div class="dashboard-card">
+          <h3>Assign work</h3>
+          <p class="card-hint">Shows up on their "Today's focus" list. They can submit a note and/or a file back to you.</p>
+          <form id="assignForm" class="admin-form">
+            <input id="assignTitle" type="text" placeholder="Title (e.g. Algebra worksheet)" required />
+            <textarea id="assignDescription" placeholder="Instructions (optional)" rows="2"></textarea>
+            <label class="card-hint" for="assignFile">Attach a file (optional, max 10MB)</label>
+            <input id="assignFile" type="file" accept=".pdf,.doc,.docx,.ppt,.pptx,.xls,.xlsx,image/*" />
+            <button type="submit">Assign</button>
+          </form>
+          <p class="auth-feedback" id="assignFeedback"></p>
+        </div>
+        <div class="dashboard-card">
+          <h3>Assignments given</h3>
+          <ul id="assignmentsList"><li>Loading…</li></ul>
+        </div>
+      </div>
+
+      <div class="dashboard-grid dashboard-grid-2">
+        <div class="dashboard-card">
+          <h3>Share a study resource</h3>
+          <p class="card-hint">To share an AI-generated material, copy its link from the Materials page into the link field below.</p>
+          <form id="resourceForm" class="admin-form">
+            <input id="resourceTitle" type="text" placeholder="Title (e.g. GCSE Maths formula sheet)" required />
+            <input id="resourceType" type="text" placeholder="Type (e.g. PDF, Link, Worksheet)" required />
+            <input id="resourceUrl" type="url" placeholder="Link (optional)" />
+            <label class="card-hint" for="resourceFile">Or upload a file (PDF, Word, PowerPoint, image — max 10MB)</label>
+            <input id="resourceFile" type="file" accept=".pdf,.doc,.docx,.ppt,.pptx,.xls,.xlsx,image/*" />
+            <button type="submit">Share</button>
+          </form>
+          <p class="auth-feedback" id="resourceFeedback"></p>
+        </div>
+        <div class="dashboard-card">
+          <h3>Resources shared</h3>
+          <ul id="resourcesList"><li>Loading…</li></ul>
+        </div>
+      </div>
+
+      <button id="signOutBtn" type="button">Sign Out</button>
+    </section>
+  </main>
+
+  <footer>
+    <p>&copy; 2023 HelloEducation. All rights reserved.</p>
+  </footer>
+
+  <script type="module">
+    import { initializeApp } from 'https://www.gstatic.com/firebasejs/12.4.0/firebase-app.js';
+    import { getAuth, onAuthStateChanged, signOut } from 'https://www.gstatic.com/firebasejs/12.4.0/firebase-auth.js';
+    import { getFirestore, collection, query, where, getDocs, getDoc, addDoc, deleteDoc, updateDoc, doc, serverTimestamp } from 'https://www.gstatic.com/firebasejs/12.4.0/firebase-firestore.js';
+    import { getStorage, ref, uploadBytes, getDownloadURL } from 'https://www.gstatic.com/firebasejs/12.4.0/firebase-storage.js';
+    import { firebaseConfig, isFirebaseConfigured } from './firebase-config.js';
+
+    const role = localStorage.getItem('helloEducationRole');
+    if (role !== 'tutor') {
+      window.location.href = 'login.html?role=tutor';
+    }
+
+    const studentId = new URLSearchParams(window.location.search).get('studentId');
+    if (!studentId) {
+      window.location.href = 'tutor-students.html';
+    }
+
+    const app = initializeApp(firebaseConfig);
+    const auth = getAuth(app);
+    const db = getFirestore(app);
+    const storage = getStorage(app);
+    const welcomeMessage = document.getElementById('welcomeMessage');
+    const summaryText = document.getElementById('summaryText');
+    const assignForm = document.getElementById('assignForm');
+    const assignFeedback = document.getElementById('assignFeedback');
+    const assignmentsList = document.getElementById('assignmentsList');
+    const resourceForm = document.getElementById('resourceForm');
+    const resourceFeedback = document.getElementById('resourceFeedback');
+    const resourcesList = document.getElementById('resourcesList');
+    const signOutBtn = document.getElementById('signOutBtn');
+
+    let studentEmail = '';
+
+    async function loadStudent() {
+      const studentSnap = await getDoc(doc(db, 'students', studentId));
+      if (!studentSnap.exists()) {
+        welcomeMessage.textContent = 'Student not found';
+        summaryText.textContent = 'This student account may have been removed.';
+        return;
+      }
+      const student = studentSnap.data();
+      studentEmail = student.email || '';
+      document.getElementById('pageHeading').textContent = `Tutor — ${student.name}`;
+      welcomeMessage.textContent = student.name;
+      summaryText.textContent = `${student.email}${student.grade ? ` — Grade ${student.grade}` : ''}`;
+    }
+
+    async function renderAssignments() {
+      if (!auth.currentUser) return;
+      const assignmentsQuery = query(
+        collection(db, 'assignments'),
+        where('studentId', '==', studentId),
+        where('createdBy', '==', auth.currentUser.uid)
+      );
+      const snapshot = await getDocs(assignmentsQuery);
+      const assignments = snapshot.docs
+        .map((docSnap) => ({ id: docSnap.id, ...docSnap.data() }))
+        .sort((a, b) => (b.createdAt?.toMillis() || 0) - (a.createdAt?.toMillis() || 0));
+
+      assignmentsList.innerHTML = assignments.length
+        ? assignments.map((a) => `
+          <li>
+            <div>
+              <strong>${a.title}</strong> <span class="status-badge">${a.status}</span>
+              ${a.description ? `<br>${a.description}` : ''}
+              ${a.attachmentUrl ? `<br>Attachment: <a href="${a.attachmentUrl}" target="_blank" rel="noopener">${a.attachmentName || 'View file'}</a>` : ''}
+              ${a.status !== 'assigned' ? `<br>Submission: ${a.submissionNote || '(no note)'}${a.fileUrl ? ` — <a href="${a.fileUrl}" target="_blank" rel="noopener">${a.fileName || 'View file'}</a>` : ''}` : ''}
+              ${a.feedback ? `<br>Your feedback: ${a.feedback}` : ''}
+            </div>
+            ${a.status === 'submitted' ? `
+              <div class="dashboard-actions">
+                <input type="text" placeholder="Feedback" data-feedback-input="${a.id}" />
+                <button class="action-btn" data-mark-reviewed="${a.id}" type="button">Mark reviewed</button>
+              </div>
+            ` : ''}
+          </li>
+        `).join('')
+        : '<li>No assignments given yet.</li>';
+    }
+
+    assignmentsList.addEventListener('click', async (event) => {
+      const button = event.target.closest('button[data-mark-reviewed]');
+      if (!button) return;
+      const feedbackInput = assignmentsList.querySelector(`input[data-feedback-input="${button.dataset.markReviewed}"]`);
+      await updateDoc(doc(db, 'assignments', button.dataset.markReviewed), {
+        status: 'reviewed',
+        feedback: feedbackInput.value.trim(),
+        reviewedAt: serverTimestamp()
+      });
+      await renderAssignments();
+    });
+
+    assignForm.addEventListener('submit', async (event) => {
+      event.preventDefault();
+      assignFeedback.textContent = 'Assigning…';
+
+      const title = document.getElementById('assignTitle').value.trim();
+      const description = document.getElementById('assignDescription').value.trim();
+      const file = document.getElementById('assignFile').files[0];
+
+      try {
+        let attachmentUrl = null;
+        let attachmentName = null;
+        if (file) {
+          assignFeedback.textContent = 'Uploading…';
+          const fileRef = ref(storage, `study-resources/${auth.currentUser.uid}/${Date.now()}-${file.name}`);
+          await uploadBytes(fileRef, file);
+          attachmentUrl = await getDownloadURL(fileRef);
+          attachmentName = file.name;
+        }
+
+        await addDoc(collection(db, 'assignments'), {
+          studentId,
+          studentEmail,
+          title,
+          description,
+          attachmentUrl,
+          attachmentName,
+          status: 'assigned',
+          submissionNote: '',
+          fileUrl: null,
+          fileName: null,
+          feedback: '',
+          createdBy: auth.currentUser.uid,
+          createdAt: serverTimestamp()
+        });
+
+        assignFeedback.textContent = 'Assigned.';
+        assignForm.reset();
+        await renderAssignments();
+      } catch (error) {
+        assignFeedback.textContent = error.message || 'Could not assign this. Please try again.';
+      }
+    });
+
+    async function renderResources() {
+      if (!auth.currentUser) return;
+      const resourcesQuery = query(
+        collection(db, 'studyResources'),
+        where('studentId', '==', studentId),
+        where('createdBy', '==', auth.currentUser.uid)
+      );
+      const snapshot = await getDocs(resourcesQuery);
+      const resources = snapshot.docs
+        .map((docSnap) => ({ id: docSnap.id, ...docSnap.data() }))
+        .sort((a, b) => (b.createdAt?.toMillis() || 0) - (a.createdAt?.toMillis() || 0));
+
+      resourcesList.innerHTML = resources.length
+        ? resources.map((r) => `
+          <li>
+            <span>${r.title} <span class="status-badge">${r.type}</span>${r.url ? ` — <a href="${r.url}" target="_blank" rel="noopener">Open</a>` : ''}</span>
+            <button class="action-btn secondary" data-remove-resource="${r.id}" type="button">Remove</button>
+          </li>
+        `).join('')
+        : '<li>Nothing shared yet.</li>';
+    }
+
+    resourcesList.addEventListener('click', async (event) => {
+      const button = event.target.closest('button[data-remove-resource]');
+      if (!button) return;
+      if (!confirm('Remove this resource?')) return;
+      await deleteDoc(doc(db, 'studyResources', button.dataset.removeResource));
+      await renderResources();
+    });
+
+    resourceForm.addEventListener('submit', async (event) => {
+      event.preventDefault();
+      resourceFeedback.textContent = 'Sharing…';
+
+      const title = document.getElementById('resourceTitle').value.trim();
+      const type = document.getElementById('resourceType').value.trim();
+      let url = document.getElementById('resourceUrl').value.trim();
+      const file = document.getElementById('resourceFile').files[0];
+
+      try {
+        if (file) {
+          resourceFeedback.textContent = 'Uploading…';
+          const fileRef = ref(storage, `study-resources/${auth.currentUser.uid}/${Date.now()}-${file.name}`);
+          await uploadBytes(fileRef, file);
+          url = await getDownloadURL(fileRef);
+        }
+
+        await addDoc(collection(db, 'studyResources'), {
+          studentId,
+          studentEmail,
+          title,
+          type,
+          url: url || null,
+          createdBy: auth.currentUser.uid,
+          createdAt: serverTimestamp()
+        });
+
+        resourceFeedback.textContent = 'Shared.';
+        resourceForm.reset();
+        await renderResources();
+      } catch (error) {
+        resourceFeedback.textContent = error.message || 'Could not share this. Please try again.';
+      }
+    });
+
+    onAuthStateChanged(auth, async (user) => {
+      if (!user && !isFirebaseConfigured()) {
+        summaryText.textContent = 'Demo mode is active. Connect Firebase to see real data.';
+        return;
+      }
+
+      if (!user) {
+        window.location.href = 'login.html?role=tutor';
+        return;
+      }
+
+      await loadStudent();
+      renderAssignments();
+      renderResources();
+    });
+
+    signOutBtn.addEventListener('click', async () => {
+      if (!isFirebaseConfigured()) {
+        localStorage.removeItem('helloEducationRole');
+        localStorage.removeItem('helloEducationUser');
+        window.location.href = 'login.html?role=tutor';
+        return;
+      }
+
+      await signOut(auth);
+    });
+  </script>
+  <script>
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('sw.js').catch(() => {});
+      });
+    }
+  </script>
+</body>
+</html>
