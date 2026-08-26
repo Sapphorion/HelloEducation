@@ -45,20 +45,32 @@
 
       <div class="dashboard-grid dashboard-grid-2">
         <div class="dashboard-card">
-          <h3>Assign work</h3>
-          <p class="card-hint">Shows up on their "Today's focus" list. They can submit a note and/or a file back to you.</p>
-          <form id="assignForm" class="admin-form">
-            <input id="assignTitle" type="text" placeholder="Title (e.g. Algebra worksheet)" required />
-            <textarea id="assignDescription" placeholder="Instructions (optional)" rows="2"></textarea>
-            <label class="card-hint" for="assignFile">Attach a file (optional, max 10MB)</label>
-            <input id="assignFile" type="file" accept=".pdf,.doc,.docx,.ppt,.pptx,.xls,.xlsx,image/*" />
-            <button type="submit">Assign</button>
+          <h3>Log a session</h3>
+          <p class="card-hint">Scheduled sessions get a video call link automatically.</p>
+          <form id="sessionForm" class="admin-form">
+            <div class="form-row">
+              <input id="sessionSubject" type="text" placeholder="Subject" required />
+              <input id="sessionDateTime" type="datetime-local" required />
+            </div>
+            <div class="form-row">
+              <select id="sessionFormat" required>
+                <option value="online">Online</option>
+                <option value="faceToFace">Face-to-face</option>
+              </select>
+              <select id="sessionStatus" required>
+                <option value="scheduled">Scheduled</option>
+                <option value="completed">Completed</option>
+                <option value="cancelled">Cancelled</option>
+              </select>
+            </div>
+            <textarea id="sessionNotes" placeholder="Notes / feedback (optional)" rows="2"></textarea>
+            <button type="submit">Save session</button>
           </form>
-          <p class="auth-feedback" id="assignFeedback"></p>
+          <p class="auth-feedback" id="sessionFeedback"></p>
         </div>
         <div class="dashboard-card">
-          <h3>Assignments given</h3>
-          <ul id="assignmentsList"><li>Loading…</li></ul>
+          <h3>Sessions with this student</h3>
+          <ul id="sessionsList"><li>Loading…</li></ul>
         </div>
       </div>
 
@@ -82,6 +94,25 @@
         </div>
       </div>
 
+      <div class="dashboard-grid dashboard-grid-2">
+        <div class="dashboard-card">
+          <h3>Assign work</h3>
+          <p class="card-hint">Shows up on their "Today's focus" list. They can submit a note and/or a file back to you.</p>
+          <form id="assignForm" class="admin-form">
+            <input id="assignTitle" type="text" placeholder="Title (e.g. Algebra worksheet)" required />
+            <textarea id="assignDescription" placeholder="Instructions (optional)" rows="2"></textarea>
+            <label class="card-hint" for="assignFile">Attach a file (optional, max 10MB)</label>
+            <input id="assignFile" type="file" accept=".pdf,.doc,.docx,.ppt,.pptx,.xls,.xlsx,image/*" />
+            <button type="submit">Assign</button>
+          </form>
+          <p class="auth-feedback" id="assignFeedback"></p>
+        </div>
+        <div class="dashboard-card">
+          <h3>Assignments given</h3>
+          <ul id="assignmentsList"><li>Loading…</li></ul>
+        </div>
+      </div>
+
       <button id="signOutBtn" type="button">Sign Out</button>
     </section>
   </main>
@@ -93,7 +124,7 @@
   <script type="module">
     import { initializeApp } from 'https://www.gstatic.com/firebasejs/12.4.0/firebase-app.js';
     import { getAuth, onAuthStateChanged, signOut } from 'https://www.gstatic.com/firebasejs/12.4.0/firebase-auth.js';
-    import { getFirestore, collection, query, where, getDocs, getDoc, addDoc, deleteDoc, updateDoc, doc, serverTimestamp } from 'https://www.gstatic.com/firebasejs/12.4.0/firebase-firestore.js';
+    import { getFirestore, collection, query, where, getDocs, getDoc, addDoc, deleteDoc, updateDoc, doc, Timestamp, serverTimestamp } from 'https://www.gstatic.com/firebasejs/12.4.0/firebase-firestore.js';
     import { getStorage, ref, uploadBytes, getDownloadURL } from 'https://www.gstatic.com/firebasejs/12.4.0/firebase-storage.js';
     import { firebaseConfig, isFirebaseConfigured } from './firebase-config.js';
 
@@ -111,8 +142,20 @@
     const auth = getAuth(app);
     const db = getFirestore(app);
     const storage = getStorage(app);
+    function generateMeetingLink() {
+      const slug = crypto.randomUUID().replace(/-/g, '').slice(0, 16);
+      return `https://meet.jit.si/HelloEducation-${slug}`;
+    }
+
+    function formatLabel(session) {
+      return session.format === 'faceToFace' ? 'Face-to-face' : 'Online';
+    }
+
     const welcomeMessage = document.getElementById('welcomeMessage');
     const summaryText = document.getElementById('summaryText');
+    const sessionForm = document.getElementById('sessionForm');
+    const sessionFeedback = document.getElementById('sessionFeedback');
+    const sessionsList = document.getElementById('sessionsList');
     const assignForm = document.getElementById('assignForm');
     const assignFeedback = document.getElementById('assignFeedback');
     const assignmentsList = document.getElementById('assignmentsList');
@@ -136,6 +179,60 @@
       welcomeMessage.textContent = student.name;
       summaryText.textContent = `${student.email}${student.grade ? ` — Grade ${student.grade}` : ''}`;
     }
+
+    async function renderSessions() {
+      if (!auth.currentUser) return;
+      const sessionsQuery = query(
+        collection(db, 'sessions'),
+        where('studentId', '==', studentId),
+        where('tutorId', '==', auth.currentUser.uid)
+      );
+      const snapshot = await getDocs(sessionsQuery);
+      const sessions = snapshot.docs
+        .map((docSnap) => ({ id: docSnap.id, ...docSnap.data() }))
+        .filter((s) => s.status !== 'pending')
+        .sort((a, b) => (b.scheduledAt?.toMillis() || 0) - (a.scheduledAt?.toMillis() || 0));
+
+      sessionsList.innerHTML = sessions.length
+        ? sessions.map((s) => `
+          <li>
+            <span>${s.subject} — ${s.scheduledAt.toDate().toLocaleString()} <span class="status-badge">${s.status}</span> <span class="status-badge">${formatLabel(s)}</span>${s.meetingLink ? ` — <a href="${s.meetingLink}" target="_blank" rel="noopener">Meeting link</a>` : ''}${s.notes ? `<br>${s.notes}` : ''}</span>
+          </li>
+        `).join('')
+        : '<li>No sessions logged yet.</li>';
+    }
+
+    sessionForm.addEventListener('submit', async (event) => {
+      event.preventDefault();
+      sessionFeedback.textContent = 'Saving…';
+
+      const subject = document.getElementById('sessionSubject').value.trim();
+      const dateTimeValue = document.getElementById('sessionDateTime').value;
+      const format = document.getElementById('sessionFormat').value;
+      const status = document.getElementById('sessionStatus').value;
+      const notes = document.getElementById('sessionNotes').value.trim();
+
+      try {
+        await addDoc(collection(db, 'sessions'), {
+          studentId,
+          studentEmail,
+          tutorId: auth.currentUser.uid,
+          subject,
+          scheduledAt: Timestamp.fromDate(new Date(dateTimeValue)),
+          status,
+          format,
+          notes,
+          meetingLink: status === 'scheduled' ? generateMeetingLink() : null,
+          createdAt: serverTimestamp()
+        });
+
+        sessionFeedback.textContent = 'Session saved.';
+        sessionForm.reset();
+        await renderSessions();
+      } catch (error) {
+        sessionFeedback.textContent = error.message || 'Could not save this session. Please try again.';
+      }
+    });
 
     async function renderAssignments() {
       if (!auth.currentUser) return;
@@ -302,8 +399,9 @@
       }
 
       await loadStudent();
-      renderAssignments();
+      renderSessions();
       renderResources();
+      renderAssignments();
     });
 
     signOutBtn.addEventListener('click', async () => {
