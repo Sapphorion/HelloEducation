@@ -1,4 +1,4 @@
-const CACHE_NAME = 'helloeducation-static-v1';
+const CACHE_NAME = 'helloeducation-static-v2';
 
 // Only truly static, non-personalized assets are cached. Firestore/Firebase
 // requests and every dashboard/data page are always fetched fresh from the
