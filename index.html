@@ -17,36 +17,38 @@
         .hero {
             background: white;
             border-radius: 12px;
-            padding: 2.5rem 2rem;
+            padding: 1.5rem 1.5rem;
             box-shadow: 0 8px 16px rgba(0, 0, 0, 0.2);
             text-align: center;
         }
         .hero h2 {
-            font-size: 1.8rem;
+            font-size: 1.3rem;
             color: #04342C;
-            margin-bottom: 0.75rem;
+            margin-bottom: 0.5rem;
         }
         .hero p {
-            max-width: 640px;
+            max-width: 560px;
             margin: 0 auto;
             color: #333;
+            font-size: 0.95rem;
         }
         .hero-actions {
             display: flex;
             justify-content: center;
-            gap: 1rem;
+            gap: 0.75rem;
             flex-wrap: wrap;
-            margin-top: 1.5rem;
+            margin-top: 1rem;
         }
         .hero-btn {
             display: inline-flex;
             align-items: center;
-            padding: 0.7rem 1.4rem;
+            padding: 0.5rem 1.1rem;
             border-radius: 999px;
             background: #085041;
             color: white;
             text-decoration: none;
             font-weight: 600;
+            font-size: 0.9rem;
             transition: background-color 0.2s ease, transform 0.2s ease;
         }
         .hero-btn:hover {
@@ -63,24 +65,25 @@
         .section-heading {
             color: white;
             text-align: center;
-            font-size: 1.5rem;
-            margin: 3rem 0 1.25rem;
+            font-size: 1.15rem;
+            margin: 2rem 0 0.6rem;
         }
         .section-lead {
             color: #E1F5EE;
             text-align: center;
-            max-width: 640px;
-            margin: 0 auto 1.5rem;
+            max-width: 560px;
+            font-size: 0.9rem;
+            margin: 0 auto 1rem;
         }
         .audience-grid {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
-            gap: 1.5rem;
+            grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+            gap: 1rem;
         }
         .audience-card {
             background: white;
             border-radius: 12px;
-            padding: 1.75rem;
+            padding: 1.1rem;
             box-shadow: 0 8px 16px rgba(0, 0, 0, 0.2);
             transition: transform 0.3s, box-shadow 0.3s;
         }
@@ -92,25 +95,28 @@
             display: inline-block;
             background: #E1F5EE;
             color: #04342C;
-            font-size: 0.75rem;
+            font-size: 0.68rem;
             font-weight: 700;
             letter-spacing: 0.03em;
             text-transform: uppercase;
-            padding: 0.2rem 0.6rem;
+            padding: 0.15rem 0.5rem;
             border-radius: 999px;
-            margin-bottom: 0.6rem;
+            margin-bottom: 0.45rem;
         }
         .audience-card h3 {
             color: #04342C;
-            margin-bottom: 0.5rem;
+            font-size: 1.05rem;
+            margin-bottom: 0.35rem;
         }
         .audience-card p {
             color: #333;
-            margin-bottom: 1rem;
+            font-size: 0.9rem;
+            margin-bottom: 0.6rem;
         }
         .audience-card a {
             color: #0F6E56;
             font-weight: 600;
+            font-size: 0.9rem;
             text-decoration: none;
         }
         .audience-card a:hover {
@@ -119,56 +125,58 @@
         .why-grid {
             display: grid;
             grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-            gap: 1.25rem;
+            gap: 0.85rem;
         }
         .why-card {
             background: rgba(255, 255, 255, 0.08);
             border: 1px solid rgba(255, 255, 255, 0.25);
             border-radius: 12px;
-            padding: 1.25rem;
+            padding: 0.9rem 1rem;
             color: white;
         }
         .why-card h3 {
-            font-size: 1.05rem;
-            margin-bottom: 0.4rem;
+            font-size: 0.95rem;
+            margin-bottom: 0.3rem;
         }
         .why-card p {
             color: #E1F5EE;
-            font-size: 0.95rem;
+            font-size: 0.85rem;
         }
         .home-cta {
             background: white;
             border-radius: 12px;
-            padding: 2rem;
-            margin-top: 3rem;
+            padding: 1.5rem;
+            margin-top: 2rem;
             text-align: center;
             box-shadow: 0 8px 16px rgba(0, 0, 0, 0.2);
         }
         .home-cta h2 {
             color: #04342C;
-            margin-bottom: 0.5rem;
+            font-size: 1.2rem;
+            margin-bottom: 0.4rem;
         }
         .home-cta p {
             color: #333;
-            margin-bottom: 1.25rem;
+            font-size: 0.9rem;
+            margin-bottom: 0.9rem;
         }
 
         @media (max-width: 768px) {
             .hero {
-                padding: 1.75rem 1.25rem;
+                padding: 1.25rem 1rem;
             }
             .hero h2 {
-                font-size: 1.4rem;
+                font-size: 1.15rem;
             }
             .section-heading {
-                font-size: 1.25rem;
-                margin: 2rem 0 1rem;
+                font-size: 1.05rem;
+                margin: 1.5rem 0 0.5rem;
             }
         }
 
         @media (max-width: 480px) {
             .hero {
-                padding: 1.5rem 1rem;
+                padding: 1rem 0.85rem;
             }
         }
     </style>
