@@ -29,7 +29,7 @@ header h1 {
 
 .site-logo {
   display: block;
-  height: 80px;
+  height: 125px;
   width: auto;
   margin: 0 auto 0.2rem;
   border-radius: 12px;
@@ -70,7 +70,7 @@ footer {
   }
 
   .site-logo {
-    height: 64px;
+    height: 100px;
   }
 }
 
@@ -90,7 +90,7 @@ footer {
   }
 
   .site-logo {
-    height: 56px;
+    height: 88px;
   }
 }
 
