@@ -1,11 +1,13 @@
 // Firestore setup helper for HelloEducation
 // Run this in the browser console after the site is loaded, or use it as a reference for your Firebase console.
 
-import { initializeApp } from 'https://www.gstatic.com/firebasejs/12.4.0/firebase-app.js';
+import { initializeApp, getApps, getApp } from 'https://www.gstatic.com/firebasejs/12.4.0/firebase-app.js';
 import { getFirestore, collection, doc, setDoc } from 'https://www.gstatic.com/firebasejs/12.4.0/firebase-firestore.js';
 import { firebaseConfig } from './firebase-config.js';
 
-const app = initializeApp(firebaseConfig);
+// Reuse the default app if a page (e.g. login.html) already initialized one —
+// calling initializeApp twice throws app/duplicate-app and aborts the module.
+const app = getApps().length ? getApp() : initializeApp(firebaseConfig);
 const db = getFirestore(app);
 
 export async function createUserRoleDocument(uid, role, email = '', name = '') {

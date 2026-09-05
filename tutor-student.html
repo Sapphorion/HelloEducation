@@ -127,6 +127,7 @@
     import { getFirestore, collection, query, where, getDocs, getDoc, addDoc, deleteDoc, updateDoc, doc, Timestamp, serverTimestamp } from 'https://www.gstatic.com/firebasejs/12.4.0/firebase-firestore.js';
     import { getStorage, ref, uploadBytes, getDownloadURL } from 'https://www.gstatic.com/firebasejs/12.4.0/firebase-storage.js';
     import { firebaseConfig, isFirebaseConfigured } from './firebase-config.js';
+    import { isMeetingLinkVisible } from './session-utils.js';
 
     const role = localStorage.getItem('helloEducationRole');
     if (role !== 'tutor') {
@@ -196,7 +197,7 @@
       sessionsList.innerHTML = sessions.length
         ? sessions.map((s) => `
           <li>
-            <span>${s.subject} — ${s.scheduledAt.toDate().toLocaleString()} <span class="status-badge">${s.status}</span> <span class="status-badge">${formatLabel(s)}</span>${s.meetingLink ? ` — <a href="${s.meetingLink}" target="_blank" rel="noopener">Meeting link</a>` : ''}${s.notes ? `<br>${s.notes}` : ''}</span>
+            <span>${s.subject} — ${s.scheduledAt.toDate().toLocaleString()} <span class="status-badge">${s.status}</span> <span class="status-badge">${formatLabel(s)}</span>${isMeetingLinkVisible(s) ? ` — <a href="${s.meetingLink}" target="_blank" rel="noopener">Meeting link</a>` : ''}${s.notes ? `<br>${s.notes}` : ''}</span>
           </li>
         `).join('')
         : '<li>No sessions logged yet.</li>';

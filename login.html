@@ -58,7 +58,7 @@
   </footer>
 
   <script type="module">
-    import { initializeApp } from 'https://www.gstatic.com/firebasejs/12.4.0/firebase-app.js';
+    import { initializeApp, getApps, getApp } from 'https://www.gstatic.com/firebasejs/12.4.0/firebase-app.js';
     import { getAuth, signInWithEmailAndPassword, signOut } from 'https://www.gstatic.com/firebasejs/12.4.0/firebase-auth.js';
     import { getFirestore, doc, getDoc } from 'https://www.gstatic.com/firebasejs/12.4.0/firebase-firestore.js';
     import { firebaseConfig, isFirebaseConfigured } from './firebase-config.js';
@@ -102,7 +102,11 @@
     let db = null;
 
     if (!isDemoMode) {
-      const app = initializeApp(firebaseConfig);
+      // firestore-setup.js (imported above) already initializes the default
+      // app at module load, so reuse it rather than calling initializeApp
+      // again — a second call throws app/duplicate-app and kills this script,
+      // which would leave the sign-in form with no submit handler.
+      const app = getApps().length ? getApp() : initializeApp(firebaseConfig);
       auth = getAuth(app);
       db = getFirestore(app);
     }

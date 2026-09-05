@@ -104,6 +104,7 @@
     import { getAuth, onAuthStateChanged, signOut } from 'https://www.gstatic.com/firebasejs/12.4.0/firebase-auth.js';
     import { getFirestore, collection, query, where, orderBy, getDocs, addDoc, deleteDoc, updateDoc, doc, Timestamp, serverTimestamp } from 'https://www.gstatic.com/firebasejs/12.4.0/firebase-firestore.js';
     import { firebaseConfig, isFirebaseConfigured } from './firebase-config.js';
+    import { isMeetingLinkVisible } from './session-utils.js';
 
     const DAY_NAMES = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
     const AVAILABILITY_HOURS = Array.from({ length: 14 }, (_, i) => i + 7); // 7am–9pm
@@ -214,7 +215,7 @@
       mySessionsList.innerHTML = logged.length
         ? logged.map((s) => `
           <li>
-            <span>${s.studentEmail || 'Student'} — ${s.subject} — ${s.scheduledAt.toDate().toLocaleString()} <span class="status-badge">${s.status}</span> <span class="status-badge">${formatLabel(s)}</span>${s.meetingLink ? ` — <a href="${s.meetingLink}" target="_blank" rel="noopener">Meeting link</a>` : ''}${s.notes ? `<br>${s.notes}` : ''}</span>
+            <span>${s.studentEmail || 'Student'} — ${s.subject} — ${s.scheduledAt.toDate().toLocaleString()} <span class="status-badge">${s.status}</span> <span class="status-badge">${formatLabel(s)}</span>${isMeetingLinkVisible(s) ? ` — <a href="${s.meetingLink}" target="_blank" rel="noopener">Meeting link</a>` : ''}${s.notes ? `<br>${s.notes}` : ''}</span>
             <button class="action-btn secondary" data-set-link="${s.id}" type="button">${s.meetingLink ? 'Edit link' : 'Add link'}</button>
           </li>
         `).join('')
