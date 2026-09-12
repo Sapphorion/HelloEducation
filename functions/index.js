@@ -1081,6 +1081,42 @@ exports.onMatricQuestionAnswered = onDocumentUpdated({ document: 'matricQuestion
   });
 });
 
+// Confirms a session to the student the moment it has a meeting link —
+// either a tutor logging an already-scheduled session directly (create) or
+// accepting a pending request / editing the link later (update). Without
+// this, the only email a student ever got with their link was the same-day
+// 07:00 SAST reminder below, which misses any session accepted for later
+// that same day (the 07:00 run has already passed, and by tomorrow it's no
+// longer "today" in that query) — the link then never reached them at all.
+exports.onSessionCreated = onDocumentCreated({ document: 'sessions/{sessionId}', secrets: [zohoAppPassword] }, async (event) => {
+  const s = event.data.data();
+  if (!s.meetingLink) return;
+  await sendEmail({
+    to: s.studentEmail,
+    subject: `Session confirmed: ${s.subject}`,
+    html: `
+      <p>Hi,</p>
+      <p>Your ${s.subject} session is confirmed for ${s.scheduledAt.toDate().toLocaleString('en-ZA', { timeZone: 'Africa/Johannesburg' })}.</p>
+      <p><a href="${s.meetingLink}">Join session</a></p>
+    `
+  });
+});
+
+exports.onSessionUpdated = onDocumentUpdated({ document: 'sessions/{sessionId}', secrets: [zohoAppPassword] }, async (event) => {
+  const before = event.data.before.data();
+  const after = event.data.after.data();
+  if (!after.meetingLink || after.meetingLink === before.meetingLink) return;
+  await sendEmail({
+    to: after.studentEmail,
+    subject: `Session confirmed: ${after.subject}`,
+    html: `
+      <p>Hi,</p>
+      <p>Your ${after.subject} session is confirmed for ${after.scheduledAt.toDate().toLocaleString('en-ZA', { timeZone: 'Africa/Johannesburg' })}.</p>
+      <p><a href="${after.meetingLink}">Join session</a></p>
+    `
+  });
+});
+
 // --- Daily session reminders, 07:00 SAST. South Africa has no DST, so a
 // fixed +2h offset from UTC is always correct — no timezone library needed.
 
