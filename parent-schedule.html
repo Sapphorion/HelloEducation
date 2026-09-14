@@ -54,7 +54,7 @@
               <option value="">Choose a tutor…</option>
             </select>
             <div id="bookingCalendarWrapper" style="display:none;">
-              <p class="card-hint">Click an available hour to book it.</p>
+              <p class="card-hint">Click an available time to book it.</p>
               <div class="calendar-legend">
                 <span><i class="swatch-available"></i> Available</span>
                 <span><i class="swatch-booked"></i> Already booked</span>
@@ -131,12 +131,23 @@
     const myRequestsList = document.getElementById('myRequestsList');
     const signOutBtn = document.getElementById('signOutBtn');
 
-    const BOOKING_HOURS = Array.from({ length: 14 }, (_, i) => i + 7); // 7am–9pm
+    // Half-hour marks from 7:00am through 8:30pm — the last bookable start
+    // stays within the same 7am–9pm window the hourly grid used, just at
+    // twice the resolution.
+    const BOOKING_SLOTS = [];
+    for (let h = 7; h <= 20; h++) {
+      BOOKING_SLOTS.push({ hour: h, minute: 0 });
+      BOOKING_SLOTS.push({ hour: h, minute: 30 });
+    }
     function pad2(n) { return String(n).padStart(2, '0'); }
-    function hourLabel(hour) {
+    function timeToMinutes(t) {
+      const [h, m] = t.split(':').map(Number);
+      return h * 60 + m;
+    }
+    function timeLabel(hour, minute) {
       const period = hour < 12 ? 'am' : 'pm';
       const displayHour = hour % 12 === 0 ? 12 : hour % 12;
-      return `${displayHour}${period}`;
+      return `${displayHour}:${pad2(minute)}${period}`;
     }
     const MAX_WEEKS_AHEAD = 11; // ~3 months of bookable horizon
 
@@ -228,13 +239,16 @@
       }
 
       const slots = availabilitySnap.docs.map((d) => d.data());
+      // Built at minute resolution (not hour-by-hour) so a tutor's
+      // hour-aligned availability block still yields a bookable mark at
+      // every half hour within it, e.g. 15:00–18:00 covers 15:00, 15:30,
+      // 16:00, ... 17:30.
       const availableIndex = new Set();
       slots.forEach((slot) => {
-        const [startHour] = slot.startTime.split(':').map(Number);
-        const [endHour, endMinute] = slot.endTime.split(':').map(Number);
-        const lastHour = endMinute > 0 ? endHour : endHour - 1;
-        for (let h = startHour; h <= lastHour; h++) {
-          availableIndex.add(`${slot.dayOfWeek}-${pad2(h)}:00`);
+        const startMin = timeToMinutes(slot.startTime);
+        const endMin = timeToMinutes(slot.endTime);
+        for (let m = startMin; m < endMin; m += 30) {
+          availableIndex.add(`${slot.dayOfWeek}-${pad2(Math.floor(m / 60))}:${pad2(m % 60)}`);
         }
       });
 
@@ -242,12 +256,12 @@
 
       const now = new Date();
       const headerRow = `<tr><th></th>${days.map((d) => `<th>${DAY_NAMES[d.getDay()].slice(0, 3)}<br>${d.getDate()}</th>`).join('')}</tr>`;
-      const bodyRows = BOOKING_HOURS.map((hour) => {
+      const bodyRows = BOOKING_SLOTS.map(({ hour, minute }) => {
         const cells = days.map((day) => {
           const cellDate = new Date(day);
-          cellDate.setHours(hour, 0, 0, 0);
+          cellDate.setHours(hour, minute, 0, 0);
           const dayOfWeek = day.getDay();
-          const key = `${dayOfWeek}-${pad2(hour)}:00`;
+          const key = `${dayOfWeek}-${pad2(hour)}:${pad2(minute)}`;
           const isPast = cellDate.getTime() <= now.getTime();
           const isBooked = bookedTimes.has(cellDate.getTime());
           const isAvailable = availableIndex.has(key);
@@ -261,9 +275,9 @@
           if (isBooked) {
             return `<td><button type="button" class="availability-cell booked" disabled aria-label="Already booked"></button></td>`;
           }
-          return `<td><button type="button" class="availability-cell active" data-datetime="${cellDate.toISOString()}" aria-label="${DAY_NAMES[dayOfWeek]} ${hourLabel(hour)}"></button></td>`;
+          return `<td><button type="button" class="availability-cell active" data-datetime="${cellDate.toISOString()}" aria-label="${DAY_NAMES[dayOfWeek]} ${timeLabel(hour, minute)}"></button></td>`;
         }).join('');
-        return `<tr><th>${hourLabel(hour)}</th>${cells}</tr>`;
+        return `<tr><th>${timeLabel(hour, minute)}</th>${cells}</tr>`;
       }).join('');
 
       bookingCalendar.innerHTML = `<table class="availability-grid"><thead>${headerRow}</thead><tbody>${bodyRows}</tbody></table>`;
@@ -308,7 +322,7 @@
         return;
       }
       if (!selectedDateTime) {
-        requestFeedback.textContent = 'Click an available hour on the calendar first.';
+        requestFeedback.textContent = 'Click an available time on the calendar first.';
         return;
       }
 
