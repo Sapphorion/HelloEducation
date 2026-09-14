@@ -58,8 +58,10 @@
             <input id="matricResourceTitle" type="text" placeholder="Title (e.g. Maths formula sheet)" required />
             <input id="matricResourceType" type="text" placeholder="Type (e.g. PDF, Link, Worksheet)" required />
             <input id="matricResourceUrl" type="url" placeholder="Link (optional)" />
-            <label class="card-hint" for="matricResourceFile">Or upload a file (PDF, Word, PowerPoint, image — max 25MB)</label>
-            <input id="matricResourceFile" type="file" accept=".pdf,.doc,.docx,.ppt,.pptx,.xls,.xlsx,image/*" />
+            <label class="card-hint" for="matricResourceFile">Or upload one or more files (PDF, Word, PowerPoint, image — max 25MB each)</label>
+            <input id="matricResourceFile" type="file" accept=".pdf,.doc,.docx,.ppt,.pptx,.xls,.xlsx,image/*" multiple />
+            <label class="card-hint" for="matricResourceFolder">…or upload a whole folder of files instead</label>
+            <input id="matricResourceFolder" type="file" webkitdirectory multiple />
             <button type="submit">Share</button>
           </form>
           <p class="auth-feedback" id="matricResourceFeedback"></p>
@@ -213,6 +215,16 @@
       await renderMatricResources();
     });
 
+    // A folder-select input (webkitdirectory) and a regular multi-file input
+    // can't coexist on one <input> — the browser locks it to one mode or the
+    // other — so this form offers both and just combines whatever ended up
+    // picked. Selecting in one clears the other so it's obvious only one
+    // selection is in play.
+    const matricResourceFileInput = document.getElementById('matricResourceFile');
+    const matricResourceFolderInput = document.getElementById('matricResourceFolder');
+    matricResourceFileInput.addEventListener('change', () => { if (matricResourceFileInput.files.length) matricResourceFolderInput.value = ''; });
+    matricResourceFolderInput.addEventListener('change', () => { if (matricResourceFolderInput.files.length) matricResourceFileInput.value = ''; });
+
     document.getElementById('matricResourceForm').addEventListener('submit', async (event) => {
       event.preventDefault();
       const matricResourceFeedback = document.getElementById('matricResourceFeedback');
@@ -221,8 +233,8 @@
       const studentEmail = document.getElementById('matricResourceStudentEmail').value.trim();
       const title = document.getElementById('matricResourceTitle').value.trim();
       const type = document.getElementById('matricResourceType').value.trim();
-      let url = document.getElementById('matricResourceUrl').value.trim();
-      const file = document.getElementById('matricResourceFile').files[0];
+      const url = document.getElementById('matricResourceUrl').value.trim();
+      const files = [...matricResourceFileInput.files, ...matricResourceFolderInput.files];
 
       try {
         const studentQuery = query(collection(db, 'matricStudents'), where('email', '==', studentEmail));
@@ -233,24 +245,30 @@
           return;
         }
 
-        if (file) {
-          matricResourceFeedback.textContent = 'Uploading…';
+        const entries = files.length ? [] : [{ title, url: url || null }];
+
+        for (const [index, file] of files.entries()) {
+          matricResourceFeedback.textContent = `Uploading ${index + 1} of ${files.length}…`;
           const fileRef = ref(storage, `study-resources/${auth.currentUser.uid}/${Date.now()}-${file.name}`);
           await uploadBytes(fileRef, file);
-          url = await getDownloadURL(fileRef);
+          const fileUrl = await getDownloadURL(fileRef);
+          entries.push({ title: files.length > 1 ? `${title} — ${file.webkitRelativePath || file.name}` : title, url: fileUrl });
         }
 
-        await addDoc(collection(db, 'matricStudyResources'), {
-          studentId: studentSnap.docs[0].id,
-          studentEmail,
-          title,
-          type,
-          url: url || null,
-          createdBy: auth.currentUser.uid,
-          createdAt: serverTimestamp()
-        });
+        matricResourceFeedback.textContent = 'Sharing…';
+        for (const entry of entries) {
+          await addDoc(collection(db, 'matricStudyResources'), {
+            studentId: studentSnap.docs[0].id,
+            studentEmail,
+            title: entry.title,
+            type,
+            url: entry.url,
+            createdBy: auth.currentUser.uid,
+            createdAt: serverTimestamp()
+          });
+        }
 
-        matricResourceFeedback.textContent = 'Shared.';
+        matricResourceFeedback.textContent = entries.length > 1 ? `Shared ${entries.length} resources.` : 'Shared.';
         event.target.reset();
         await renderMatricResources();
       } catch (error) {

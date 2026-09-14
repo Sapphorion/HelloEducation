@@ -76,8 +76,10 @@
           <input id="resourceTitle" type="text" placeholder="Title" required />
           <input id="resourceType" type="text" placeholder="Type (e.g. PDF, Link, Worksheet)" required />
           <input id="resourceUrl" type="url" placeholder="Link (optional)" />
-          <label class="card-hint" for="resourceFile">Or upload a file (PDF, Word, PowerPoint, image — max 25MB)</label>
-          <input id="resourceFile" type="file" accept=".pdf,.doc,.docx,.ppt,.pptx,.xls,.xlsx,image/*" />
+          <label class="card-hint" for="resourceFile">Or upload one or more files (PDF, Word, PowerPoint, image — max 25MB each)</label>
+          <input id="resourceFile" type="file" accept=".pdf,.doc,.docx,.ppt,.pptx,.xls,.xlsx,image/*" multiple />
+          <label class="card-hint" for="resourceFolder">…or upload a whole folder of files instead</label>
+          <input id="resourceFolder" type="file" webkitdirectory multiple />
           <button type="submit">Share with class</button>
         </form>
         <p class="auth-feedback" id="resourceFeedback"></p>
@@ -378,6 +380,16 @@
       }
     });
 
+    // A folder-select input (webkitdirectory) and a regular multi-file input
+    // can't coexist on one <input> — the browser locks it to one mode or the
+    // other — so this form offers both and just combines whatever ended up
+    // picked. Selecting in one clears the other so it's obvious only one
+    // selection is in play.
+    const resourceFileInput = document.getElementById('resourceFile');
+    const resourceFolderInput = document.getElementById('resourceFolder');
+    resourceFileInput.addEventListener('change', () => { if (resourceFileInput.files.length) resourceFolderInput.value = ''; });
+    resourceFolderInput.addEventListener('change', () => { if (resourceFolderInput.files.length) resourceFileInput.value = ''; });
+
     resourceForm.addEventListener('submit', async (event) => {
       event.preventDefault();
 
@@ -388,34 +400,39 @@
 
       const title = document.getElementById('resourceTitle').value.trim();
       const type = document.getElementById('resourceType').value.trim();
-      let url = document.getElementById('resourceUrl').value.trim();
-      const file = document.getElementById('resourceFile').files[0];
+      const url = document.getElementById('resourceUrl').value.trim();
+      const files = [...resourceFileInput.files, ...resourceFolderInput.files];
 
       try {
-        if (file) {
-          resourceFeedback.textContent = 'Uploading…';
+        const entries = files.length ? [] : [{ title, url: url || null }];
+
+        for (const [index, file] of files.entries()) {
+          resourceFeedback.textContent = `Uploading ${index + 1} of ${files.length}…`;
           const fileRef = ref(storage, `study-resources/${auth.currentUser.uid}/${Date.now()}-${file.name}`);
           await uploadBytes(fileRef, file);
-          url = await getDownloadURL(fileRef);
+          const fileUrl = await getDownloadURL(fileRef);
+          entries.push({ title: files.length > 1 ? `${title} — ${file.webkitRelativePath || file.name}` : title, url: fileUrl });
         }
 
         resourceFeedback.textContent = 'Sharing…';
-        const batch = writeBatch(db);
-        roster.forEach((student) => {
-          batch.set(doc(collection(db, 'matricStudyResources')), {
-            subject,
-            studentId: student.id,
-            studentEmail: student.email || '',
-            title,
-            type,
-            url: url || null,
-            createdBy: auth.currentUser.uid,
-            createdAt: serverTimestamp()
+        // One doc per student per resource — chunked at 400 writes/batch,
+        // safely under Firestore's 500-per-batch cap, since a folder's worth
+        // of files times a class roster can add up.
+        const writes = [];
+        entries.forEach((entry) => {
+          roster.forEach((student) => {
+            writes.push({ subject, studentId: student.id, studentEmail: student.email || '', title: entry.title, type, url: entry.url, createdBy: auth.currentUser.uid, createdAt: serverTimestamp() });
           });
         });
-        await batch.commit();
+        for (let i = 0; i < writes.length; i += 400) {
+          const batch = writeBatch(db);
+          writes.slice(i, i + 400).forEach((data) => batch.set(doc(collection(db, 'matricStudyResources')), data));
+          await batch.commit();
+        }
 
-        resourceFeedback.textContent = `Shared with ${roster.length} student(s).`;
+        resourceFeedback.textContent = entries.length > 1
+          ? `Shared ${entries.length} resources with ${roster.length} student(s).`
+          : `Shared with ${roster.length} student(s).`;
         resourceForm.reset();
         await renderRecentContent();
       } catch (error) {

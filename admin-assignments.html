@@ -52,8 +52,10 @@
             <input id="adminResourceTitle" type="text" placeholder="Title" required />
             <input id="adminResourceType" type="text" placeholder="Type (e.g. PDF, Link, Worksheet)" required />
             <input id="adminResourceUrl" type="url" placeholder="Link (optional)" />
-            <label class="card-hint" for="adminResourceFile">Or upload a file (PDF, Word, PowerPoint, image — max 25MB)</label>
-            <input id="adminResourceFile" type="file" accept=".pdf,.doc,.docx,.ppt,.pptx,.xls,.xlsx,image/*" />
+            <label class="card-hint" for="adminResourceFile">Or upload one or more files (PDF, Word, PowerPoint, image — max 25MB each)</label>
+            <input id="adminResourceFile" type="file" accept=".pdf,.doc,.docx,.ppt,.pptx,.xls,.xlsx,image/*" multiple />
+            <label class="card-hint" for="adminResourceFolder">…or upload a whole folder of files instead</label>
+            <input id="adminResourceFolder" type="file" webkitdirectory multiple />
             <button type="submit">Share</button>
           </form>
           <p class="auth-feedback" id="adminResourceFeedback"></p>
@@ -185,6 +187,16 @@
       }
     });
 
+    // A folder-select input (webkitdirectory) and a regular multi-file input
+    // can't coexist on one <input> — the browser locks it to one mode or the
+    // other — so this form offers both and just combines whatever ended up
+    // picked. Selecting in one clears the other so it's obvious only one
+    // selection is in play.
+    const adminResourceFileInput = document.getElementById('adminResourceFile');
+    const adminResourceFolderInput = document.getElementById('adminResourceFolder');
+    adminResourceFileInput.addEventListener('change', () => { if (adminResourceFileInput.files.length) adminResourceFolderInput.value = ''; });
+    adminResourceFolderInput.addEventListener('change', () => { if (adminResourceFolderInput.files.length) adminResourceFileInput.value = ''; });
+
     document.getElementById('adminResourceForm').addEventListener('submit', async (event) => {
       event.preventDefault();
       const resourceFeedback = document.getElementById('adminResourceFeedback');
@@ -193,8 +205,8 @@
       const studentEmail = document.getElementById('adminResourceStudentEmail').value.trim();
       const title = document.getElementById('adminResourceTitle').value.trim();
       const type = document.getElementById('adminResourceType').value.trim();
-      let url = document.getElementById('adminResourceUrl').value.trim();
-      const file = document.getElementById('adminResourceFile').files[0];
+      const url = document.getElementById('adminResourceUrl').value.trim();
+      const files = [...adminResourceFileInput.files, ...adminResourceFolderInput.files];
 
       try {
         const studentQuery = query(collection(db, 'users'), where('email', '==', studentEmail), where('role', '==', 'student'));
@@ -205,24 +217,30 @@
           return;
         }
 
-        if (file) {
-          resourceFeedback.textContent = 'Uploading…';
+        const entries = files.length ? [] : [{ title, url: url || null }];
+
+        for (const [index, file] of files.entries()) {
+          resourceFeedback.textContent = `Uploading ${index + 1} of ${files.length}…`;
           const fileRef = ref(storage, `study-resources/${auth.currentUser.uid}/${Date.now()}-${file.name}`);
           await uploadBytes(fileRef, file);
-          url = await getDownloadURL(fileRef);
+          const fileUrl = await getDownloadURL(fileRef);
+          entries.push({ title: files.length > 1 ? `${title} — ${file.webkitRelativePath || file.name}` : title, url: fileUrl });
         }
 
-        await addDoc(collection(db, 'studyResources'), {
-          studentId: studentSnap.docs[0].id,
-          studentEmail,
-          title,
-          type,
-          url: url || null,
-          createdBy: auth.currentUser.uid,
-          createdAt: serverTimestamp()
-        });
+        resourceFeedback.textContent = 'Sharing…';
+        for (const entry of entries) {
+          await addDoc(collection(db, 'studyResources'), {
+            studentId: studentSnap.docs[0].id,
+            studentEmail,
+            title: entry.title,
+            type,
+            url: entry.url,
+            createdBy: auth.currentUser.uid,
+            createdAt: serverTimestamp()
+          });
+        }
 
-        resourceFeedback.textContent = 'Shared.';
+        resourceFeedback.textContent = entries.length > 1 ? `Shared ${entries.length} resources.` : 'Shared.';
         event.target.reset();
         await renderAdminResources();
       } catch (error) {

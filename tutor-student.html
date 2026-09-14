@@ -85,8 +85,10 @@
             <input id="resourceTitle" type="text" placeholder="Title (e.g. GCSE Maths formula sheet)" required />
             <input id="resourceType" type="text" placeholder="Type (e.g. PDF, Link, Worksheet)" required />
             <input id="resourceUrl" type="url" placeholder="Link (optional)" />
-            <label class="card-hint" for="resourceFile">Or upload a file (PDF, Word, PowerPoint, image — max 25MB)</label>
-            <input id="resourceFile" type="file" accept=".pdf,.doc,.docx,.ppt,.pptx,.xls,.xlsx,image/*" />
+            <label class="card-hint" for="resourceFile">Or upload one or more files (PDF, Word, PowerPoint, image — max 25MB each)</label>
+            <input id="resourceFile" type="file" accept=".pdf,.doc,.docx,.ppt,.pptx,.xls,.xlsx,image/*" multiple />
+            <label class="card-hint" for="resourceFolder">…or upload a whole folder of files instead</label>
+            <input id="resourceFolder" type="file" webkitdirectory multiple />
             <button type="submit">Share</button>
           </form>
           <p class="auth-feedback" id="resourceFeedback"></p>
@@ -363,34 +365,51 @@
       await renderResources();
     });
 
+    // A folder-select input (webkitdirectory) and a regular multi-file input
+    // can't coexist on one <input> — the browser locks it to one mode or the
+    // other — so this form offers both and just combines whatever ended up
+    // picked. Selecting in one clears the other so it's obvious only one
+    // selection is in play.
+    const resourceFileInput = document.getElementById('resourceFile');
+    const resourceFolderInput = document.getElementById('resourceFolder');
+    resourceFileInput.addEventListener('change', () => { if (resourceFileInput.files.length) resourceFolderInput.value = ''; });
+    resourceFolderInput.addEventListener('change', () => { if (resourceFolderInput.files.length) resourceFileInput.value = ''; });
+
     resourceForm.addEventListener('submit', async (event) => {
       event.preventDefault();
       resourceFeedback.textContent = 'Sharing…';
 
       const title = document.getElementById('resourceTitle').value.trim();
       const type = document.getElementById('resourceType').value.trim();
-      let url = document.getElementById('resourceUrl').value.trim();
-      const file = document.getElementById('resourceFile').files[0];
+      const url = document.getElementById('resourceUrl').value.trim();
+      const files = [...resourceFileInput.files, ...resourceFolderInput.files];
 
       try {
-        if (file) {
-          resourceFeedback.textContent = 'Uploading…';
+        // No files picked: share a single link-only resource, same as before.
+        const entries = files.length ? [] : [{ title, url: url || null }];
+
+        for (const [index, file] of files.entries()) {
+          resourceFeedback.textContent = `Uploading ${index + 1} of ${files.length}…`;
           const fileRef = ref(storage, `study-resources/${auth.currentUser.uid}/${Date.now()}-${file.name}`);
           await uploadBytes(fileRef, file);
-          url = await getDownloadURL(fileRef);
+          const fileUrl = await getDownloadURL(fileRef);
+          entries.push({ title: files.length > 1 ? `${title} — ${file.webkitRelativePath || file.name}` : title, url: fileUrl });
         }
 
-        await addDoc(collection(db, 'studyResources'), {
-          studentId,
-          studentEmail,
-          title,
-          type,
-          url: url || null,
-          createdBy: auth.currentUser.uid,
-          createdAt: serverTimestamp()
-        });
+        resourceFeedback.textContent = 'Sharing…';
+        for (const entry of entries) {
+          await addDoc(collection(db, 'studyResources'), {
+            studentId,
+            studentEmail,
+            title: entry.title,
+            type,
+            url: entry.url,
+            createdBy: auth.currentUser.uid,
+            createdAt: serverTimestamp()
+          });
+        }
 
-        resourceFeedback.textContent = 'Shared.';
+        resourceFeedback.textContent = entries.length > 1 ? `Shared ${entries.length} resources.` : 'Shared.';
         resourceForm.reset();
         await renderResources();
       } catch (error) {
