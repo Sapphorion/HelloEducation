@@ -49,6 +49,7 @@
       </form>
 
       <p class="auth-feedback" id="authFeedback"></p>
+      <button class="auth-toggle" type="button" id="forgotPasswordBtn">Forgot your password?</button>
       <button class="auth-toggle" type="button" id="toggleMode">Need an account? Contact HelloEducation</button>
     </section>
   </main>
@@ -59,7 +60,7 @@
 
   <script type="module">
     import { initializeApp, getApps, getApp } from 'https://www.gstatic.com/firebasejs/12.4.0/firebase-app.js';
-    import { getAuth, signInWithEmailAndPassword, signOut } from 'https://www.gstatic.com/firebasejs/12.4.0/firebase-auth.js';
+    import { getAuth, signInWithEmailAndPassword, signOut, sendPasswordResetEmail } from 'https://www.gstatic.com/firebasejs/12.4.0/firebase-auth.js';
     import { getFirestore, doc, getDoc } from 'https://www.gstatic.com/firebasejs/12.4.0/firebase-firestore.js';
     import { firebaseConfig, isFirebaseConfigured } from './firebase-config.js';
     import { createUserRoleDocument } from './firestore-setup.js';
@@ -182,6 +183,32 @@
       } catch (error) {
         feedback.textContent = error.message || 'Unable to sign in.';
       }
+    });
+
+    document.getElementById('forgotPasswordBtn').addEventListener('click', async () => {
+      const email = document.getElementById('email').value.trim();
+      if (!email) {
+        feedback.textContent = 'Enter your email address above first, then tap "Forgot your password?" again.';
+        return;
+      }
+
+      if (isDemoMode) {
+        feedback.textContent = 'Demo mode is active — connect Firebase to send real password reset emails.';
+        return;
+      }
+
+      feedback.textContent = 'Sending…';
+      try {
+        await sendPasswordResetEmail(auth, email);
+      } catch (error) {
+        // auth/user-not-found is deliberately treated the same as success —
+        // otherwise this becomes a way to check which emails have accounts.
+        if (error.code !== 'auth/user-not-found') {
+          feedback.textContent = error.message || 'Could not send the reset email. Please try again.';
+          return;
+        }
+      }
+      feedback.textContent = `If an account exists for ${email}, a password reset link has been sent.`;
     });
   </script>
   <script>

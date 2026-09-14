@@ -59,6 +59,18 @@
       </div>
 
       <div class="dashboard-card">
+        <h3>My profile</h3>
+        <form id="profileForm" class="admin-form">
+          <label for="profileName">Name</label>
+          <input id="profileName" type="text" placeholder="Your name" required />
+          <label for="profilePhone">Phone number</label>
+          <input id="profilePhone" type="tel" placeholder="e.g. 082 123 4567" />
+          <button type="submit">Save profile</button>
+        </form>
+        <p class="auth-feedback" id="profileFeedback"></p>
+      </div>
+
+      <div class="dashboard-card">
         <h3>Change password</h3>
         <form id="changePasswordForm" class="admin-form">
           <input id="currentPassword" type="password" placeholder="Current password" required />
@@ -79,7 +91,7 @@
   <script type="module">
     import { initializeApp } from 'https://www.gstatic.com/firebasejs/12.4.0/firebase-app.js';
     import { getAuth, onAuthStateChanged, signOut, EmailAuthProvider, reauthenticateWithCredential, updatePassword } from 'https://www.gstatic.com/firebasejs/12.4.0/firebase-auth.js';
-    import { getFirestore, doc, getDoc } from 'https://www.gstatic.com/firebasejs/12.4.0/firebase-firestore.js';
+    import { getFirestore, doc, getDoc, updateDoc } from 'https://www.gstatic.com/firebasejs/12.4.0/firebase-firestore.js';
     import { firebaseConfig, isFirebaseConfigured } from './firebase-config.js';
 
     const role = localStorage.getItem('helloEducationRole');
@@ -95,6 +107,10 @@
     const signOutBtn = document.getElementById('signOutBtn');
     const changePasswordForm = document.getElementById('changePasswordForm');
     const changePasswordFeedback = document.getElementById('changePasswordFeedback');
+    const profileForm = document.getElementById('profileForm');
+    const profileFeedback = document.getElementById('profileFeedback');
+    const profileName = document.getElementById('profileName');
+    const profilePhone = document.getElementById('profilePhone');
 
     onAuthStateChanged(auth, async (user) => {
       if (!user && !isFirebaseConfigured()) {
@@ -108,7 +124,26 @@
       }
 
       const userDocSnap = await getDoc(doc(db, 'users', user.uid));
-      welcomeMessage.textContent = `Welcome back, ${(userDocSnap.exists() && userDocSnap.data().name) || user.email || 'parent'}!`;
+      const userData = userDocSnap.exists() ? userDocSnap.data() : {};
+      welcomeMessage.textContent = `Welcome back, ${userData.name || user.email || 'parent'}!`;
+      profileName.value = userData.name || '';
+      profilePhone.value = userData.phone || '';
+    });
+
+    profileForm.addEventListener('submit', async (event) => {
+      event.preventDefault();
+      profileFeedback.textContent = 'Saving…';
+
+      const name = profileName.value.trim();
+      const phone = profilePhone.value.trim();
+
+      try {
+        await updateDoc(doc(db, 'users', auth.currentUser.uid), { name, phone });
+        welcomeMessage.textContent = `Welcome back, ${name || auth.currentUser.email || 'parent'}!`;
+        profileFeedback.textContent = 'Profile updated.';
+      } catch (error) {
+        profileFeedback.textContent = error.message || 'Could not update your profile. Please try again.';
+      }
     });
 
     changePasswordForm.addEventListener('submit', async (event) => {
