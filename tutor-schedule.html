@@ -91,6 +91,10 @@
 
       <div class="dashboard-card">
         <h3>My logged sessions</h3>
+        <div class="auth-tabs" id="sessionsTabs" role="tablist" aria-label="Session status">
+          <button class="auth-tab active" type="button" data-sessions-tab="active">Active</button>
+          <button class="auth-tab" type="button" data-sessions-tab="completed">Completed</button>
+        </div>
         <ul id="mySessionsList"><li>Loading…</li></ul>
       </div>
 
@@ -202,6 +206,7 @@
     });
 
     let allMySessions = [];
+    let sessionsTabFilter = 'active';
 
     async function renderMySessions() {
       if (!auth.currentUser) return;
@@ -213,7 +218,16 @@
       const snapshot = await getDocs(sessionsQuery);
       allMySessions = snapshot.docs.map((docSnap) => ({ id: docSnap.id, ...docSnap.data() }));
 
-      const logged = allMySessions.filter((s) => s.status !== 'pending');
+      renderFilteredMySessions();
+      renderRequests();
+    }
+
+    // Just re-filters/re-renders the already-fetched sessions for whichever
+    // tab is active — switching tabs doesn't need a fresh Firestore read.
+    function renderFilteredMySessions() {
+      const logged = allMySessions.filter((s) => s.status !== 'pending'
+        && (sessionsTabFilter === 'completed' ? s.status === 'completed' : s.status !== 'completed'));
+
       mySessionsList.innerHTML = logged.length
         ? logged.map((s) => `
           <li>
@@ -224,10 +238,16 @@
             </div>
           </li>
         `).join('')
-        : '<li>No sessions logged yet.</li>';
-
-      renderRequests();
+        : `<li>No ${sessionsTabFilter === 'completed' ? 'completed' : 'active'} sessions.</li>`;
     }
+
+    document.getElementById('sessionsTabs').addEventListener('click', (event) => {
+      const tab = event.target.closest('button[data-sessions-tab]');
+      if (!tab) return;
+      sessionsTabFilter = tab.dataset.sessionsTab;
+      document.querySelectorAll('#sessionsTabs .auth-tab').forEach((btn) => btn.classList.toggle('active', btn === tab));
+      renderFilteredMySessions();
+    });
 
     function renderRequests() {
       const pending = allMySessions.filter((s) => s.status === 'pending');
