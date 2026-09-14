@@ -14,9 +14,12 @@
   <meta name="apple-mobile-web-app-title" content="HelloEducation" />
 </head>
 <body>
-  <header>
+  <header class="has-actions">
+    <div class="header-brand">
     <img src="images/HELLO..jpg" alt="HelloEducation" class="site-logo" />
     <h1 class="page-heading">Tutor — Schedule</h1>
+    </div>
+    <button id="signOutBtn" class="header-signout" type="button">Sign Out</button>
   </header>
 
   <navigation>
@@ -91,7 +94,6 @@
         <ul id="mySessionsList"><li>Loading…</li></ul>
       </div>
 
-      <button id="signOutBtn" type="button">Sign Out</button>
     </section>
   </main>
 
@@ -216,7 +218,10 @@
         ? logged.map((s) => `
           <li>
             <span>${s.studentEmail || 'Student'} — ${s.subject} — ${s.scheduledAt.toDate().toLocaleString()} <span class="status-badge">${s.status}</span> <span class="status-badge">${formatLabel(s)}</span>${isMeetingLinkVisible(s) ? ` — <a href="${s.meetingLink}" target="_blank" rel="noopener">Meeting link</a>` : ''}${s.notes ? `<br>${s.notes}` : ''}</span>
-            <button class="action-btn secondary" data-set-link="${s.id}" type="button">${s.meetingLink ? 'Edit link' : 'Add link'}</button>
+            <div class="dashboard-actions">
+              <button class="action-btn secondary" data-set-link="${s.id}" type="button">${s.meetingLink ? 'Edit link' : 'Add link'}</button>
+              ${s.status === 'scheduled' ? `<button class="action-btn" data-mark-completed="${s.id}" type="button">Mark completed</button>` : ''}
+            </div>
           </li>
         `).join('')
         : '<li>No sessions logged yet.</li>';
@@ -251,13 +256,21 @@
     });
 
     mySessionsList.addEventListener('click', async (event) => {
-      const button = event.target.closest('button[data-set-link]');
-      if (!button) return;
-      const session = allMySessions.find((s) => s.id === button.dataset.setLink);
-      const link = prompt('Meeting link for this session:', session?.meetingLink || '');
-      if (link === null) return;
-      await updateDoc(doc(db, 'sessions', button.dataset.setLink), { meetingLink: link.trim() });
-      await renderMySessions();
+      const linkButton = event.target.closest('button[data-set-link]');
+      if (linkButton) {
+        const session = allMySessions.find((s) => s.id === linkButton.dataset.setLink);
+        const link = prompt('Meeting link for this session:', session?.meetingLink || '');
+        if (link === null) return;
+        await updateDoc(doc(db, 'sessions', linkButton.dataset.setLink), { meetingLink: link.trim() });
+        await renderMySessions();
+        return;
+      }
+
+      const completeButton = event.target.closest('button[data-mark-completed]');
+      if (completeButton) {
+        await updateDoc(doc(db, 'sessions', completeButton.dataset.markCompleted), { status: 'completed' });
+        await renderMySessions();
+      }
     });
 
     // A cell's key covers every hour a legacy (pre-grid) multi-hour slot
