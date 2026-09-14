@@ -62,18 +62,9 @@
               <option value="">Choose a tutor…</option>
             </select>
             <div id="bookingCalendarWrapper" style="display:none;">
-              <p class="card-hint">Click an available time to book it.</p>
-              <div class="calendar-legend">
-                <span><i class="swatch-available"></i> Available</span>
-                <span><i class="swatch-booked"></i> Already booked</span>
-                <span><i class="swatch-selected"></i> Selected</span>
-              </div>
-              <div class="week-nav">
-                <button id="bookingPrevWeekBtn" class="action-btn secondary" type="button">&larr; Previous</button>
-                <span class="week-nav-label" id="bookingWeekLabel"></span>
-                <button id="bookingNextWeekBtn" class="action-btn secondary" type="button">Next &rarr;</button>
-              </div>
-              <div class="availability-grid-wrapper" id="bookingCalendar"></div>
+              <label for="bookingDate">Choose a date</label>
+              <input id="bookingDate" type="date" />
+              <div class="dashboard-actions" id="bookingTimeSlots"></div>
               <p class="card-hint" id="selectedTimeLabel">No time selected yet.</p>
             </div>
             <input id="requestSubject" type="text" placeholder="Subject" required />
@@ -112,8 +103,6 @@
     import { firebaseConfig, isFirebaseConfigured } from './firebase-config.js';
     import { isMeetingLinkVisible } from './session-utils.js';
 
-    const DAY_NAMES = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
-
     function formatLabel(session) {
       return session.format === 'faceToFace' ? 'Face-to-face' : 'Online';
     }
@@ -137,10 +126,8 @@
     const requestSessionForm = document.getElementById('requestSessionForm');
     const requestTutor = document.getElementById('requestTutor');
     const bookingCalendarWrapper = document.getElementById('bookingCalendarWrapper');
-    const bookingCalendar = document.getElementById('bookingCalendar');
-    const bookingWeekLabel = document.getElementById('bookingWeekLabel');
-    const bookingPrevWeekBtn = document.getElementById('bookingPrevWeekBtn');
-    const bookingNextWeekBtn = document.getElementById('bookingNextWeekBtn');
+    const bookingDateInput = document.getElementById('bookingDate');
+    const bookingTimeSlots = document.getElementById('bookingTimeSlots');
     const selectedTimeLabel = document.getElementById('selectedTimeLabel');
     const requestSubject = document.getElementById('requestSubject');
     const requestFeedback = document.getElementById('requestFeedback');
@@ -165,117 +152,113 @@
       const displayHour = hour % 12 === 0 ? 12 : hour % 12;
       return `${displayHour}:${pad2(minute)}${period}`;
     }
-    const MAX_WEEKS_AHEAD = 11; // ~3 months of bookable horizon
-
-    // Sunday-first dates for the week `offset` weeks from the current one,
-    // matching the tutor's own availability grid so "Monday" always lines
-    // up with the same weekday across both pages.
-    function getWeekDates(offset) {
-      const now = new Date();
-      const sunday = new Date(now);
-      sunday.setDate(now.getDate() - now.getDay() + offset * 7);
-      sunday.setHours(0, 0, 0, 0);
-      return Array.from({ length: 7 }, (_, i) => {
-        const d = new Date(sunday);
-        d.setDate(sunday.getDate() + i);
-        return d;
-      });
+    function dateToLocalISO(d) {
+      return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
     }
-
-    function weekRangeLabel(days) {
-      return `${days[0].toLocaleDateString(undefined, { day: 'numeric', month: 'short' })} – ${days[6].toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' })}`;
-    }
+    const MAX_DAYS_AHEAD = 77; // ~11 weeks of bookable horizon, same as before
 
     let selectedDateTime = null;
-    let bookingWeekOffset = 0;
-    let currentBookingTutorId = null;
+    let currentAvailability = []; // the selected tutor's recurring weekly slots
 
-    // Renders a 7-day x hourly grid for the chosen tutor and week: green =
-    // the tutor's recurring weekly availability lands on this date, amber =
-    // available but a session is already booked then, grey = past or not
-    // offered. Clicking a green cell selects that exact date/time.
-    async function renderBookingCalendar(tutorId) {
-      currentBookingTutorId = tutorId;
+    function resetBooking() {
       selectedDateTime = null;
       selectedTimeLabel.textContent = 'No time selected yet.';
+      bookingTimeSlots.innerHTML = '';
+      bookingDateInput.value = '';
+    }
+
+    // Picking a tutor just loads their recurring weekly availability (one
+    // read) and opens the date picker — nothing tutor-specific is rendered
+    // until a date is actually chosen.
+    async function onTutorChange() {
+      const tutorId = requestTutor.value;
+      const selectedOption = requestTutor.options[requestTutor.selectedIndex];
+      requestSubject.value = selectedOption.dataset.subject || '';
+      resetBooking();
 
       if (!tutorId) {
         bookingCalendarWrapper.style.display = 'none';
-        bookingCalendar.innerHTML = '';
+        currentAvailability = [];
         return;
       }
+
       bookingCalendarWrapper.style.display = '';
-      bookingCalendar.innerHTML = '<p>Loading…</p>';
-      bookingWeekLabel.textContent = weekRangeLabel(getWeekDates(bookingWeekOffset));
-      bookingPrevWeekBtn.disabled = bookingWeekOffset <= 0;
-      bookingNextWeekBtn.disabled = bookingWeekOffset >= MAX_WEEKS_AHEAD;
+      const today = new Date();
+      const maxDate = new Date(today);
+      maxDate.setDate(maxDate.getDate() + MAX_DAYS_AHEAD);
+      bookingDateInput.min = dateToLocalISO(today);
+      bookingDateInput.max = dateToLocalISO(maxDate);
 
-      const days = getWeekDates(bookingWeekOffset);
-      const rangeEndDate = new Date(days[6]);
-      rangeEndDate.setDate(rangeEndDate.getDate() + 1);
+      const availabilitySnap = await getDocs(query(collection(db, 'availability'), where('tutorId', '==', tutorId)));
+      currentAvailability = availabilitySnap.docs.map((d) => d.data());
+    }
 
-      let availabilitySnap, bookedResult;
-      try {
-        [availabilitySnap, bookedResult] = await Promise.all([
-          getDocs(query(collection(db, 'availability'), where('tutorId', '==', tutorId))),
-          getTutorBookedTimesCallable({ tutorId, rangeStart: days[0].toISOString(), rangeEnd: rangeEndDate.toISOString() })
-        ]);
-      } catch (error) {
-        bookingCalendar.innerHTML = `<p>${error.message || 'Could not load the tutor\'s availability. Please try again.'}</p>`;
+    // Shows just the chosen date's bookable times for the selected tutor —
+    // only the real options (open and already-taken slots), not a whole
+    // week's grid of mostly-empty cells.
+    async function renderTimeSlotsForDate() {
+      selectedDateTime = null;
+      selectedTimeLabel.textContent = 'No time selected yet.';
+
+      const dateStr = bookingDateInput.value;
+      if (!dateStr) {
+        bookingTimeSlots.innerHTML = '';
         return;
       }
 
-      const slots = availabilitySnap.docs.map((d) => d.data());
-      // Built at minute resolution (not hour-by-hour) so a tutor's
-      // hour-aligned availability block still yields a bookable mark at
-      // every half hour within it, e.g. 15:00–18:00 covers 15:00, 15:30,
-      // 16:00, ... 17:30.
-      const availableIndex = new Set();
-      slots.forEach((slot) => {
+      const selectedDate = new Date(`${dateStr}T00:00:00`);
+      const dayAvailability = currentAvailability.filter((slot) => slot.dayOfWeek === selectedDate.getDay());
+
+      if (!dayAvailability.length) {
+        bookingTimeSlots.innerHTML = '<p class="card-hint">This tutor isn\'t available that day.</p>';
+        return;
+      }
+
+      const availableMinutes = new Set();
+      dayAvailability.forEach((slot) => {
         const startMin = timeToMinutes(slot.startTime);
         const endMin = timeToMinutes(slot.endTime);
-        for (let m = startMin; m < endMin; m += 30) {
-          availableIndex.add(`${slot.dayOfWeek}-${pad2(Math.floor(m / 60))}:${pad2(m % 60)}`);
-        }
+        for (let m = startMin; m < endMin; m += 30) availableMinutes.add(m);
       });
 
+      bookingTimeSlots.innerHTML = '<p>Loading…</p>';
+      const rangeStart = new Date(selectedDate);
+      const rangeEnd = new Date(selectedDate);
+      rangeEnd.setDate(rangeEnd.getDate() + 1);
+
+      let bookedResult;
+      try {
+        bookedResult = await getTutorBookedTimesCallable({ tutorId: requestTutor.value, rangeStart: rangeStart.toISOString(), rangeEnd: rangeEnd.toISOString() });
+      } catch (error) {
+        bookingTimeSlots.innerHTML = `<p>${error.message || 'Could not load available times. Please try again.'}</p>`;
+        return;
+      }
       const bookedTimes = new Set(bookedResult.data.bookedTimes);
 
       const now = new Date();
-      const headerRow = `<tr><th></th>${days.map((d) => `<th>${DAY_NAMES[d.getDay()].slice(0, 3)}<br>${d.getDate()}</th>`).join('')}</tr>`;
-      const bodyRows = BOOKING_SLOTS.map(({ hour, minute }) => {
-        const cells = days.map((day) => {
-          const cellDate = new Date(day);
+      const buttons = BOOKING_SLOTS
+        .filter(({ hour, minute }) => availableMinutes.has(hour * 60 + minute))
+        .map(({ hour, minute }) => {
+          const cellDate = new Date(selectedDate);
           cellDate.setHours(hour, minute, 0, 0);
-          const dayOfWeek = day.getDay();
-          const key = `${dayOfWeek}-${pad2(hour)}:${pad2(minute)}`;
-          const isPast = cellDate.getTime() <= now.getTime();
-          const isBooked = bookedTimes.has(cellDate.getTime());
-          const isAvailable = availableIndex.has(key);
+          if (cellDate.getTime() <= now.getTime()) return '';
+          if (bookedTimes.has(cellDate.getTime())) {
+            return `<button type="button" class="action-btn secondary" disabled>${timeLabel(hour, minute)} (booked)</button>`;
+          }
+          return `<button type="button" class="action-btn secondary" data-datetime="${cellDate.toISOString()}">${timeLabel(hour, minute)}</button>`;
+        })
+        .filter(Boolean)
+        .join('');
 
-          if (isPast) {
-            return `<td><button type="button" class="availability-cell past" disabled></button></td>`;
-          }
-          if (!isAvailable) {
-            return `<td><button type="button" class="availability-cell" disabled></button></td>`;
-          }
-          if (isBooked) {
-            return `<td><button type="button" class="availability-cell booked" disabled aria-label="Already booked"></button></td>`;
-          }
-          return `<td><button type="button" class="availability-cell active" data-datetime="${cellDate.toISOString()}" aria-label="${DAY_NAMES[dayOfWeek]} ${timeLabel(hour, minute)}"></button></td>`;
-        }).join('');
-        return `<tr><th>${timeLabel(hour, minute)}</th>${cells}</tr>`;
-      }).join('');
-
-      bookingCalendar.innerHTML = `<table class="availability-grid"><thead>${headerRow}</thead><tbody>${bodyRows}</tbody></table>`;
+      bookingTimeSlots.innerHTML = buttons || '<p class="card-hint">No available times left that day.</p>';
     }
 
-    bookingCalendar.addEventListener('click', (event) => {
+    bookingTimeSlots.addEventListener('click', (event) => {
       const button = event.target.closest('button[data-datetime]');
       if (!button) return;
 
-      bookingCalendar.querySelectorAll('.availability-cell.selected').forEach((el) => el.classList.remove('selected'));
-      button.classList.add('selected');
+      bookingTimeSlots.querySelectorAll('button[data-datetime]').forEach((b) => b.classList.add('secondary'));
+      button.classList.remove('secondary');
       selectedDateTime = new Date(button.dataset.datetime);
       selectedTimeLabel.textContent = `Selected: ${selectedDateTime.toLocaleString()}`;
     });
@@ -331,25 +314,8 @@
         : '<li>No tutors listed yet.</li>';
     }
 
-    requestTutor.addEventListener('change', async () => {
-      const tutorId = requestTutor.value;
-      const selectedOption = requestTutor.options[requestTutor.selectedIndex];
-      requestSubject.value = selectedOption.dataset.subject || '';
-      bookingWeekOffset = 0;
-      await renderBookingCalendar(tutorId);
-    });
-
-    bookingPrevWeekBtn.addEventListener('click', () => {
-      if (bookingWeekOffset <= 0) return;
-      bookingWeekOffset -= 1;
-      renderBookingCalendar(currentBookingTutorId);
-    });
-
-    bookingNextWeekBtn.addEventListener('click', () => {
-      if (bookingWeekOffset >= MAX_WEEKS_AHEAD) return;
-      bookingWeekOffset += 1;
-      renderBookingCalendar(currentBookingTutorId);
-    });
+    requestTutor.addEventListener('change', onTutorChange);
+    bookingDateInput.addEventListener('change', renderTimeSlotsForDate);
 
     requestSessionForm.addEventListener('submit', async (event) => {
       event.preventDefault();
@@ -370,7 +336,7 @@
         await requestSessionCallable({ tutorId, subject, scheduledAt: selectedDateTime.toISOString(), format, notes });
         requestFeedback.textContent = 'Request sent! The tutor will confirm or decline it.';
         requestSessionForm.reset();
-        await renderBookingCalendar(null);
+        await onTutorChange();
         await renderSessions();
       } catch (error) {
         requestFeedback.textContent = error.message || 'Could not send the request.';
@@ -399,9 +365,7 @@
       const tutorIdFromUrl = new URLSearchParams(window.location.search).get('tutorId');
       if (tutorIdFromUrl && requestTutor.querySelector(`option[value="${CSS.escape(tutorIdFromUrl)}"]`)) {
         requestTutor.value = tutorIdFromUrl;
-        const selectedOption = requestTutor.options[requestTutor.selectedIndex];
-        requestSubject.value = selectedOption.dataset.subject || '';
-        await renderBookingCalendar(tutorIdFromUrl);
+        await onTutorChange();
       }
     });
 
