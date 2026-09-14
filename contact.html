@@ -12,191 +12,6 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <meta name="apple-mobile-web-app-title" content="HelloEducation" />
     <title>Contact Us</title>
-    <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
-        
-        body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background: #085041;
-            min-height: 100vh;
-            padding: 20px 20px 40px;
-        }
-
-        .container {
-            max-width: 1000px;
-            margin: 0 auto;
-            background-color: white;
-            padding: 40px;
-            border-radius: 8px;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-        }
-
-        h1 {
-            text-align: center;
-            margin: 0;
-            color: white;
-            font-size: 2.1rem;
-        }
-        h1.page-heading {
-            font-size: 1.25rem;
-            margin-bottom: 10px;
-        }
-        
-        .contact-channels {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-            gap: 30px;
-            margin-bottom: 40px;
-        }
-        
-        .channel {
-            text-align: center;
-            padding: 20px;
-            border: 1px solid #ddd;
-            border-radius: 8px;
-            transition: transform 0.3s;
-            align-items: center;
-            justify-content: center;
-            display: flex;
-            flex-direction: column;
-            gap: 0.75rem;
-        }
-        
-        .channel:hover {
-            transform: translateY(-5px);
-            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
-        }
-        
-        .channel h2 {
-            color:#085041;
-            margin-bottom: 10px;
-            font-size: 1.3em;
-        }
-
-        .channel p {
-            color: #666;
-            margin-bottom: 15px;
-            font-size: 0.9em;
-        }
-
-        .channel a {
-            display: block;
-            padding: 10px 20px;
-            background-color: #085041;
-            color: white;
-            text-decoration: none;
-            border-radius: 4px;
-            transition: background-color 0.3s;
-            width: 100%;
-            text-align: center;
-        }
-
-        .channel a:hover {
-            background-color: #0F6E56;
-        }
-        
-        .form-section {
-            margin-top: 40px;
-            padding-top: 40px;
-            border-top: 2px solid #ddd;
-        }
-        
-        .form-section h2 {
-            margin-bottom: 20px;
-            color: #333;
-        }
-        
-        form {
-            display: flex;
-            flex-direction: column;
-            gap: 15px;
-        }
-        
-        input, textarea {
-            padding: 12px;
-            border: 1px solid #ddd;
-            border-radius: 4px;
-            font-family: Arial, sans-serif;
-            font-size: 1em;
-        }
-        
-        textarea {
-            resize: vertical;
-            min-height: 150px;
-        }
-        
-        button {
-            padding: 10px 20px;
-            background-color: #085041;
-            color: white;
-            border: none;
-            border-radius: 5px;
-            cursor: pointer;
-            font-size: 16px;
-            font-weight: 600;
-            transition: background-color 0.3s ease;
-        }
-
-        button:hover {
-            background-color: #0F6E56;
-        }
-
-        body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background: #085041;
-            min-height: 100vh;
-            padding: 20px 20px 40px;
-        }
-
-        @media (max-width: 768px) {
-            h1 {
-                font-size: 1.6rem;
-            }
-
-            h1.page-heading {
-                font-size: 1rem;
-                margin-bottom: 8px;
-            }
-
-            .container {
-                max-width: 100%;
-                padding: 20px;
-                margin: 0 10px;
-            }
-            
-            .contact-channels {
-                grid-template-columns: 1fr;
-                gap: 20px;
-            }
-            
-            .channel {
-                padding: 15px;
-            }
-            
-            .channel h2 {
-                font-size: 1.1rem;
-            }
-            
-            .channel a {
-                font-size: 0.9rem;
-                padding: 8px 16px;
-            }
-            
-            .form-section {
-                margin-top: 20px;
-                padding-top: 20px;
-            }
-            
-            input, textarea {
-                font-size: 16px;
-                padding: 10px;
-            }
-        }
-    </style>
 </head>
 <body>
     <header>
@@ -213,9 +28,9 @@
             <li><a href="login.html">Login</a></li>
         </ul>
     </navigation>
-    <br>
+
+    <main>
     <div class="container">
-       
        <div class="contact-channels">
             <div class="channel">
                 <h2>📧 Email</h2>
@@ -255,6 +70,11 @@
             </form>
         </div>
     </div>
+    </main>
+
+    <footer>
+        <p>&copy; 2023 HelloEducation. All rights reserved.</p>
+    </footer>
   <script>
     if ('serviceWorker' in navigator) {
       window.addEventListener('load', () => {

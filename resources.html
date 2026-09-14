@@ -12,122 +12,12 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <meta name="apple-mobile-web-app-title" content="HelloEducation" />
     <title>Resources</title>
-    <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
-
-        body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
-            background: #085041;
-            min-height: 100vh;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            padding: 20px 20px 40px;
-        }
-
-        h1 {
-            color: white;
-            margin: 0;
-            font-size: 2.1rem;
-        }
-
-        .page-heading {
-            margin: 0.2rem 0 10px;
-            color: white;
-            font-size: 1.25rem;
-        }
-
-        .section-heading {
-            color: white;
-            margin: 24px 0 12px;
-            font-size: 1.25rem;
-            max-width: 1200px;
-            width: 100%;
-        }
-
-        .button-container {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-            gap: 20px;
-            max-width: 1200px;
-            width: 100%;
-            background: white;
-            border-radius: 12px;
-            padding: 20px;
-            box-shadow: 0 8px 16px rgba(0, 0, 0, 0.15);
-            transition: transform 0.3s ease, box-shadow 0.3s ease;
-            margin-bottom: 20px;
-        }
-
-        .button-container:hover {
-            transform: translateY(-8px);
-            box-shadow: 0 12px 24px rgba(0, 0, 0, 0.25);
-        }
-
-        .btn {
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-            padding: 10px 20px;
-            background-color: #085041;
-            color: white;
-            text-decoration: none;
-            border-radius: 5px;
-            font-weight: 600;
-            font-size: 16px;
-            transition: background-color 0.3s ease;
-            border: none;
-            cursor: pointer;
-        }
-
-        .btn:hover {
-            background-color: #0F6E56;
-        }
-
-        .btn:active {
-            background-color: #0F6E56;
-            justify-self: start;
-        }
-        
-        @media (max-width: 768px) {
-            body {
-                padding: 16px 15px 30px;
-            }
-
-            h1 {
-                font-size: 1.6rem;
-            }
-
-            .page-heading {
-                font-size: 1rem;
-                margin-bottom: 8px;
-            }
-            
-            .section-heading {
-                font-size: 1.1rem;
-                margin: 20px 10px 12px;
-            }
-            
-            .button-container {
-                grid-template-columns: 1fr;
-                padding: 15px;
-                margin-bottom: 15px;
-            }
-            
-            .btn {
-                font-size: 14px;
-                padding: 8px 16px;
-            }
-        }
-    </style>
 </head>
 <body>
-    <img src="images/HELLO..jpg" alt="HelloEducation" class="site-logo" />
-    <h1 class="page-heading">Resources</h1>
+    <header>
+        <img src="images/HELLO..jpg" alt="HelloEducation" class="site-logo" />
+        <h1 class="page-heading">Resources</h1>
+    </header>
     <navigation>
         <ul>
             <li><a href="index.html">Home</a></li>
@@ -138,29 +28,34 @@
         </ul>
     </navigation>
 
-<h3 class="section-heading">Past Exam Papers</h3>
+    <main>
+        <h3 class="section-heading">Past Exam Papers</h3>
 
-    <div class="button-container">
-        <a href="https://example.com" class="btn">Grade 8</a>
-        <a href="https://example.com" class="btn">Grade 9</a>
-        <a href="https://example.com" class="btn">Grade 10</a>
-        <a href="https://example.com" class="btn">Grade 11</a>
-        <a href="https://example.com" class="btn">Grade 12</a>
-    </div>
+        <div class="button-container">
+            <a href="https://example.com" class="btn">Grade 8</a>
+            <a href="https://example.com" class="btn">Grade 9</a>
+            <a href="https://example.com" class="btn">Grade 10</a>
+            <a href="https://example.com" class="btn">Grade 11</a>
+            <a href="https://example.com" class="btn">Grade 12</a>
+        </div>
 
-<h3 class="section-heading">Educational News</h3>
+        <h3 class="section-heading">Educational News</h3>
 
-<div class="button-container left">
-        <a href="https://example.com" class="btn">Blog</a>
-        <a href="https://example.com" class="btn">Articles</a>
-        
-</div>
-  <script>
-    if ('serviceWorker' in navigator) {
-      window.addEventListener('load', () => {
-        navigator.serviceWorker.register('sw.js').catch(() => {});
-      });
-    }
-  </script>
+        <div class="button-container">
+            <a href="https://example.com" class="btn">Blog</a>
+            <a href="https://example.com" class="btn">Articles</a>
+        </div>
+    </main>
+
+    <footer>
+        <p>&copy; 2023 HelloEducation. All rights reserved.</p>
+    </footer>
+    <script>
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('sw.js').catch(() => {});
+            });
+        }
+    </script>
 </body>
 </html>
